@@ -1,0 +1,1 @@
+{"compilerOptions": {"allowSyntheticDefaultImports": true, "esModuleInterop": true, "lib": ["ES2023", "DOM"], "module": "node16", "moduleResolution": "node16", "outDir": "dist", "resolveJsonModule": true, "rootDir": ".", "skipLibCheck": true, "strict": true, "target": "ES2022"}, "include": ["src/**/*", "test/**/*"]}

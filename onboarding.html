@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flow — Setup</title>
+<style>
+body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 24px; color: #1d1d1f; }
+h1 { font-size: 18px; margin: 0 0 4px; } p.sub { font-size: 13px; color: #666; margin: 0 0 16px; }
+.row { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; } .dot.granted { background: #30d158; } .dot.missing { background: #ff9f0a; } .dot.unknown { background: #aaa; }
+.row h2 { font-size: 14px; margin: 0 0 2px; } .row p { font-size: 12px; color: #555; margin: 0 0 8px; }
+label { display: block; font-size: 12px; font-weight: 600; margin: 10px 0 4px; } input, select { box-sizing: border-box; width: 100%; font: inherit; padding: 8px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
+input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; } .hidden { display: none; } .model { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #555; }
+button { font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid #ccc; background: #fff; cursor: pointer; } button.primary { background: #007aff; border-color: #007aff; color: #fff; } button:disabled { opacity: 0.45; cursor: default; }
+footer { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; } footer small { font-size: 11px; color: #888; max-width: 260px; } #error { min-height: 16px; color: #c21d16; font-size: 12px; margin: 10px 0; }
+</style>
+</head>
+<body>
+<section id="setup-step">
+<h1>Choose transcription</h1>
+<p class="sub">Your key is encrypted in your macOS user profile and never saved in settings.json.</p>
+<label for="provider">Provider</label><select id="provider"></select>
+<label>Default transcription model</label><div id="model" class="model"></div>
+<div id="cloudflare-fields" class="hidden"><label for="account-id">Cloudflare account ID</label><input id="account-id" autocomplete="off" /><label for="gateway-id">Gateway ID</label><input id="gateway-id" value="flow" autocomplete="off" /></div>
+<label for="token">API key</label><input id="token" type="password" autocomplete="off" />
+<div id="error"></div><footer><small>You can change the provider later from the tray menu.</small><button id="btn-save" class="primary">Continue</button></footer>
+</section>
+<section id="permissions-step" class="hidden">
+<h1>Allow Flow</h1><p class="sub">One more step: Flow needs these two macOS permissions before it can dictate.</p>
+<div class="row"><span id="dot-mic" class="dot unknown"></span><div><h2>Microphone</h2><p>Records your voice while you hold the hotkey.</p><button id="btn-mic" class="primary">Enable Microphone</button></div></div>
+<div class="row"><span id="dot-ax" class="dot unknown"></span><div><h2>Accessibility</h2><p id="ax-hint">Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.</p><button id="btn-ax" class="primary">Open Accessibility Settings</button></div></div>
+<div class="row"><span class="dot unknown"></span><div><h2>Input Monitoring <span style="color:#888">(only if fn still does nothing)</span></h2><p>Newer macOS versions can also gate key taps here. Add Flow if fn remains unavailable.</p><button id="btn-im">Open Input Monitoring Settings</button></div></div>
+<footer><button id="btn-change">Change provider</button><button id="btn-done" class="primary" disabled>Finish setup</button></footer>
+</section>
+<script src="./dist/src/onboarding.js"></script>
+</body>
+</html>
