@@ -31,5 +31,6 @@ contextBridge.exposeInMainWorld('flowSetup', {
 	requestMic: () => ipcRenderer.invoke('permissions:request-mic'),
 	promptAccessibility: () => ipcRenderer.invoke('permissions:prompt-accessibility'),
 	openInputMonitoring: () => ipcRenderer.invoke('permissions:open-input-monitoring'),
+	restart: () => ipcRenderer.invoke('app:restart'),
 	complete: () => ipcRenderer.invoke('onboarding:complete'),
 })

@@ -59,3 +59,4 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - `dist/` is build output (gitignored); `release/` is packaging output (gitignored).
 - Renderer is a plain script: importing CJS modules breaks `scripts/strip-cjs-prelude.js`.
 - The fullscreen sidecar (`swift/flow-fullscreen-check`) is ground truth for pill placement; Electron's cached screen metrics go stale — do not replace the sidecar with `screen` module reads.
+- macOS evaluates Accessibility/Input Monitoring trust when the app launches: a toggle granted in System Settings only reaches a relaunched instance. The onboarding offers "Restart Flow" for this; the fn helper is also respawned automatically once `report()` sees the grant. Never assume a fresh helper spawn fixes a stale app instance — only a full relaunch does.

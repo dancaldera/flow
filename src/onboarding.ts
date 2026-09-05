@@ -16,6 +16,7 @@ declare global {
 			requestMic: () => Promise<boolean>
 			promptAccessibility: () => Promise<void>
 			openInputMonitoring: () => Promise<void>
+			restart: () => Promise<void>
 			complete: () => Promise<boolean>
 		}
 	}
@@ -43,6 +44,7 @@ const dotIm = document.getElementById('dot-im') as HTMLSpanElement
 const axHint = document.getElementById('ax-hint') as HTMLParagraphElement
 const btnAx = document.getElementById('btn-ax') as HTMLButtonElement
 const btnIm = document.getElementById('btn-im') as HTMLButtonElement
+const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement
 const btnSave = document.getElementById('btn-save') as HTMLButtonElement
 const btnDone = document.getElementById('btn-done') as HTMLButtonElement
 const btnChange = document.getElementById('btn-change') as HTMLButtonElement
@@ -243,6 +245,7 @@ async function refresh(): Promise<void> {
 	axHint.innerHTML = state.permissions.axHint ?? DEFAULT_AX_HINT
 	btnAx.textContent = state.permissions.accessibility === 'granted' ? 'Granted ✓ — re-open Settings' : 'Open Accessibility Settings'
 	btnIm.textContent = state.permissions.inputMonitoring === 'granted' ? 'Enabled ✓ — re-open Settings' : 'Open Input Monitoring Settings'
+	btnRestart.classList.toggle('hidden', state.permissions.accessibility === 'granted')
 	btnDone.disabled = !state.setup.configured || state.permissions.microphone !== 'granted' || state.permissions.accessibility !== 'granted'
 }
 
@@ -276,6 +279,7 @@ btnMic.onclick = () => void window.flowSetup.requestMic().then(refresh)
 btnAx.onclick = () => void window.flowSetup.promptAccessibility().then(refresh)
 btnIm.onclick = () => void window.flowSetup.openInputMonitoring()
 btnChange.onclick = showSetup
+btnRestart.onclick = () => void window.flowSetup.restart()
 btnDone.onclick = () => void window.flowSetup.complete().then((started) => started && window.close())
 
 void refresh().then(() => (state?.setup.configured ? showPermissions() : showSetup()))

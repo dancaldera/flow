@@ -218,6 +218,8 @@ function cancelListening(): void {
 }
 
 function spawnFnHelper(): void {
+	if (fnHelper) return
+
 	// True hold-to-talk on `fn` needs a CGEventTap helper (Electron cannot bind fn alone).
 	// The helper prints "down"/"up" lines. Absence is fine: the ⌥Space fallback covers v0.1.
 	const binary = fnHelperPath()
@@ -341,13 +343,18 @@ export async function boot(): Promise<void> {
 	})
 	ipcMain.on('flow:start-ui', () => void startListening('shortcut'))
 	ipcMain.on('flow:cancel', () => cancelListening())
-
-	ipcMain.handle('onboarding:get', async () => ({
-		permissions: await report(),
-		setup: providerStatus(),
-		providers: Object.entries(PROVIDERS).map(([id, definition]) => ({ id, ...definition })),
-		configuredProviders: STT_PROVIDERS.filter((id) => Boolean(loadProviderToken(id))),
-	}))
+	ipcMain.handle('onboarding:get', async () => {
+		const permissions = await report()
+		// Helper spawned before the grant exits denied and is never retried; a
+		// fresh spawn picks up trust as soon as the system records it.
+		if (permissions.accessibility === 'granted' && !fnHelper) spawnFnHelper()
+		return {
+			permissions,
+			setup: providerStatus(),
+			providers: Object.entries(PROVIDERS).map(([id, definition]) => ({ id, ...definition })),
+			configuredProviders: STT_PROVIDERS.filter((id) => Boolean(loadProviderToken(id))),
+		}
+	})
 	ipcMain.handle('onboarding:save-setup', (_event, setup) => saveProviderSetup(setup))
 	ipcMain.handle('permissions:request-mic', async () => {
 		const granted = await requestMicrophone()
@@ -355,6 +362,12 @@ export async function boot(): Promise<void> {
 		return granted
 	})
 	ipcMain.handle('permissions:prompt-accessibility', () => promptAccessibility())
+	ipcMain.handle('app:restart', () => {
+		// Input Monitoring and Accessibility trust are evaluated at launch; a
+		// toggle in System Settings only reaches a relaunched instance.
+		app.relaunch()
+		app.exit(0)
+	})
 	ipcMain.handle('permissions:open-input-monitoring', () => openInputMonitoringSettings())
 	ipcMain.handle('onboarding:complete', async () => {
 		await startFlowIfReady()

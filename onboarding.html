@@ -33,7 +33,7 @@ footer { margin-top: 14px; display: flex; justify-content: space-between; align-
 <h1>Allow Flow</h1><p class="sub">One more step: Flow needs these two macOS permissions before it can dictate.</p>
 <div class="row"><span id="dot-mic" class="dot unknown"></span><div><h2>Microphone</h2><p>Records your voice while you hold the hotkey.</p><button id="btn-mic" class="primary">Enable Microphone</button></div></div>
 <div class="row"><span id="dot-ax" class="dot unknown"></span><div><h2>Accessibility</h2><p id="ax-hint">Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.</p><button id="btn-ax" class="primary">Open Accessibility Settings</button></div></div>
-<div class="row"><span id="dot-im" class="dot unknown"></span><div><h2>Input Monitoring</h2><p id="im-hint">Required for the <b>fn</b> hotkey on modern macOS — Accessibility alone does not deliver real fn presses. Toggle Flow on in the list.</p><button id="btn-im">Open Input Monitoring Settings</button></div></div>
+<div class="row"><span id="dot-im" class="dot unknown"></span><div><h2>Input Monitoring</h2><p id="im-hint">Required for the <b>fn</b> hotkey on modern macOS — Accessibility alone does not deliver real fn presses. Toggle Flow on in the list, then <b>restart Flow</b>: macOS applies this permission only when the app launches.</p><button id="btn-im">Open Input Monitoring Settings</button> <button id="btn-restart" class="hidden">Restart Flow</button></div></div>
 <footer><button id="btn-change">Change provider</button><button id="btn-done" class="primary" disabled>Finish setup</button></footer>
 </section>
 <script src="./dist/src/onboarding.js"></script>
