@@ -51,7 +51,7 @@
     "build": "tsc && node scripts/strip-cjs-prelude.js",
     "check": "tsc --noEmit",
     "dev": "node scripts/dev.js",
-    "package": "npm run build && electron-builder build --mac -c.mac.identity=null",
+    "package": "npm run build && electron-builder build --mac -c.mac.identity=null --publish never",
     "start": "npm run build && electron .",
     "test": "vitest run"
   },
