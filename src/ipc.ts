@@ -13,3 +13,6 @@ export interface FlowState {
 	message?: string
 	seconds?: number
 }
+
+// How long an error stays visible on the pill before it recovers to idle.
+export const ERROR_VISIBLE_MS = 4000

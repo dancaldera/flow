@@ -1,4 +1,3 @@
-export {}
 
 declare global {
 	interface Window {
@@ -10,8 +9,10 @@ declare global {
 	}
 }
 
+// Must match ERROR_VISIBLE_MS in src/ipc.ts (renderer loads as a plain
+// <script>, so it cannot import the shared module).
+const ERROR_VISIBLE_MS = 4000
 const dot = document.getElementById('dot') as HTMLSpanElement
-const label = document.getElementById('label') as HTMLDivElement
 const hint = document.getElementById('hint') as HTMLDivElement
 
 let recorder: MediaRecorder | null = null
@@ -22,20 +23,16 @@ function setUI(phase: string, message?: string, seconds?: number): void {
 	document.body.dataset.phase = phase
 	if (phase === 'listening') {
 		dot.className = 'dot live'
-		label.textContent = seconds ? `Listening… ${seconds}s` : 'Listening…'
-		hint.textContent = message ?? 'Release fn to insert'
+		hint.textContent = seconds ? `Listening… ${seconds}s` : 'Listening…'
 	} else if (phase === 'working') {
 		dot.className = 'dot busy'
-		label.textContent = 'Transcribing…'
-		hint.textContent = message ?? ''
+		hint.textContent = 'Transcribing…'
 	} else if (phase === 'error') {
 		dot.className = 'dot err'
-		label.textContent = 'Flow'
 		hint.textContent = message ?? 'Something went wrong'
 	} else {
 		dot.className = 'dot idle'
-		label.textContent = 'Flow'
-		hint.textContent = message ?? 'Hold fn, speak, release'
+		hint.textContent = ''
 	}
 }
 
@@ -63,6 +60,7 @@ async function startCapture(): Promise<void> {
 		recorder.start(250)
 	} catch {
 		setUI('error', 'Mic blocked — allow Microphone access')
+		setTimeout(() => setUI('idle'), ERROR_VISIBLE_MS)
 	}
 }
 
