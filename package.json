@@ -56,7 +56,7 @@
     "start": "npm run build && electron .",
     "test": "vitest run"
   },
-  "version": "0.2.10",
+  "version": "0.2.11",
   "packageManager": "pnpm@11.25.0",
   "repository": {
     "type": "git",
