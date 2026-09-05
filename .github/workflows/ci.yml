@@ -37,7 +37,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec electron-builder build --mac --publish never -c.mac.identity=-
+      - run: pnpm run build && pnpm exec electron-builder build --mac --publish never -c.mac.identity=-
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
