@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('flow', {
 
 contextBridge.exposeInMainWorld('flowSetup', {
 	get: () => ipcRenderer.invoke('onboarding:get'),
-	save: (setup: { provider: string; accountId: string; gatewayId: string; token: string }) => ipcRenderer.invoke('onboarding:save-setup', setup),
+	save: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => ipcRenderer.invoke('onboarding:save-setup', setup),
 	requestMic: () => ipcRenderer.invoke('permissions:request-mic'),
 	promptAccessibility: () => ipcRenderer.invoke('permissions:prompt-accessibility'),
 	openInputMonitoring: () => ipcRenderer.invoke('permissions:open-input-monitoring'),

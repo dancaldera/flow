@@ -17,28 +17,35 @@ STT providers implement one seam (`src/services/stt.ts:SttProvider`), so adding 
 
 ```bash
 cd flow
-npm install
-npm test && npm run check
-npm start
+pnpm install
+pnpm test && pnpm check
+pnpm dev    # rebuild + restart the app on every change (hot reload)
+pnpm start  # one-shot build and run
 ```
 
 On first run, Flow opens a two-step setup window:
 
-1. Choose one transcription provider and enter its credentials. Flow assigns the provider's default transcription model automatically.
+1. Choose one transcription provider, pick a transcription model from its searchable list (or keep the default), optionally fix the spoken language (auto-detect by default), and enter its API key. Once a key is saved for a provider, later changes to model or language need no key — leave the field empty to keep it, or enter a new key to replace it.
 2. Enable **Microphone** in-app, then open **Accessibility** Settings and toggle Flow on (required for the `fn` key tap and paste-at-cursor). If `fn` still does nothing, add Flow under **Input Monitoring** too.
 
-The pill, shortcuts, and fn helper start only after both setup steps are complete. Reopen the flow anytime from tray menu → **Setup & permissions…**.
+The pill, shortcuts, and fn helper start only after both setup steps are complete. Reopen the flow anytime from tray menu → **Setup & permissions…**. Usage instructions live in the app under tray menu → **How to use Flow…** — the floating pill follows the Dock (just above it when visible, hugging the bottom edge when hidden or fullscreen), rests as a subtle empty gray pill when idle, and fills with status while listening / transcribing / reporting an error.
 
 Credentials are stored separately from `settings.json` using Electron `safeStorage` (macOS Keychain); they are never exposed to the renderer. For development, these environment variables are also recognized: `CLOUDFLARE_AI_GATEWAY_TOKEN` (or `CLOUDFLARE_API_TOKEN`), `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `AI_GATEWAY_API_KEY`, `DEEPGRAM_API_KEY`, and `ASSEMBLYAI_API_KEY`.
 
-| Provider | Assigned default model | Additional setup |
+| Provider | Selectable models (* = default) | Additional setup |
 | --- | --- | --- |
-| Cloudflare AI Gateway | `@cf/openai/whisper-large-v3-turbo` | Account ID and optional gateway ID |
-| OpenRouter | `openai/whisper-1` | API key |
-| OpenAI | `gpt-4o-mini-transcribe` | API key |
-| Vercel AI Gateway | `openai/whisper-1` | API key |
-| Deepgram | `nova-3` | API key |
-| AssemblyAI | `universal-3-5-pro` → `universal-2` fallback | API key |
+| Cloudflare AI Gateway | `@cf/openai/whisper-large-v3-turbo`*, `@cf/openai/whisper`, `@cf/openai/whisper-tiny-en` | Account ID and optional gateway ID |
+| OpenRouter | `openai/whisper-1`*, `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `deepgram/nova-3` | API key |
+| OpenAI | `gpt-4o-mini-transcribe`*, `gpt-4o-transcribe`, `whisper-1` | API key |
+| Vercel AI Gateway | `openai/whisper-1`*, `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe` | API key |
+| Deepgram | `nova-3`*, `nova-2`, `nova-3-medical`, `nova-2-meeting`, `nova-2-phonecall`, `whisper-large` | API key |
+| AssemblyAI | `universal-3-5-pro`* (→ `universal-2` fallback per request), `universal-2` | API key |
+
+Each model offers only the languages its API accepts — the picker shows Auto-detect plus that model's supported list, and anything outside it falls back to auto-detect. Notes:
+
+- Deepgram `nova-3` additionally offers `multi` for multilingual code-switching; the domain-tuned models (`nova-3-medical`, `nova-2-meeting`, `nova-2-phonecall`) are English-only.
+- AssemblyAI `universal-3-5-pro` covers 18 languages and falls back to `universal-2` (≈99 languages) automatically per request.
+- Vercel AI Gateway models are auto-detect only: the current request wrapper sends no language field.
 
 ### Cloudflare Gateway (2 min)
 
@@ -50,6 +57,7 @@ Credentials are stored separately from `settings.json` using Electron `safeStora
 
 ```bash
 swiftc -o swift/flow-fn-listener swift/fn-listener.swift -framework Cocoa
+swiftc -o swift/flow-fullscreen-check swift/fullscreen-check.swift -framework Cocoa
 npm start   # main auto-detects ./swift/flow-fn-listener
 ```
 

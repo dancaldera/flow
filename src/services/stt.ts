@@ -1,4 +1,4 @@
-import { type FlowSettings, PROVIDERS, loadProviderToken } from '../main/settings'
+import { type FlowSettings, PROVIDERS, loadProviderToken, resolveProviderModel } from '../main/settings'
 
 export interface GatewayConfig {
 	accountId: string
@@ -251,7 +251,7 @@ export class AssemblyAiStt implements SttProvider {
 
 export function createSttProvider(settings: FlowSettings): SttProvider {
 	const token = loadProviderToken(settings.provider)
-	const model = settings.model || PROVIDERS[settings.provider].defaultModel
+	const model = resolveProviderModel(settings.provider, settings.model || undefined)
 	switch (settings.provider) {
 		case 'cloudflare':
 			return new CloudflareGatewayStt(token, { accountId: settings.accountId, gatewayId: settings.gatewayId, model })

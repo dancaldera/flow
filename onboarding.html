@@ -5,15 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Flow — Setup</title>
 <style>
-body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 24px; color: #1d1d1f; }
-h1 { font-size: 18px; margin: 0 0 4px; } p.sub { font-size: 13px; color: #666; margin: 0 0 16px; }
-.row { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #e5e5e5; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 20px; color: #1d1d1f; background: #f5f5f7; }
+section { background: #fff; border: 1px solid #e5e5ea; border-radius: 14px; padding: 18px; }
+h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 4px; } p.sub { font-size: 13px; color: #666; margin: 0 0 8px; }
+.row { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #e5e5ea; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff; }
 .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; } .dot.granted { background: #30d158; } .dot.missing { background: #ff9f0a; } .dot.unknown { background: #aaa; }
 .row h2 { font-size: 14px; margin: 0 0 2px; } .row p { font-size: 12px; color: #555; margin: 0 0 8px; }
-label { display: block; font-size: 12px; font-weight: 600; margin: 10px 0 4px; } input, select { box-sizing: border-box; width: 100%; font: inherit; padding: 8px; border: 1px solid #ccc; border-radius: 8px; background: #fff; }
-input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; } .hidden { display: none; } .model { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #555; }
-button { font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid #ccc; background: #fff; cursor: pointer; } button.primary { background: #007aff; border-color: #007aff; color: #fff; } button:disabled { opacity: 0.45; cursor: default; }
-footer { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; } footer small { font-size: 11px; color: #888; max-width: 260px; } #error { min-height: 16px; color: #c21d16; font-size: 12px; margin: 10px 0; }
+label { display: block; font-size: 12px; font-weight: 600; color: #3a3a3c; margin: 14px 0 5px; } input, select { box-sizing: border-box; width: 100%; font: inherit; padding: 8px 10px; border: 1px solid #d1d1d6; border-radius: 10px; background: #fff; }
+input:focus, select:focus { outline: none; border-color: #007aff; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15); }
+input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; } input::placeholder { color: #aeaeb2; } #model-search, #language-search { font-family: inherit; } #model, #language { margin-top: 4px; } #model-hint, #language-hint { margin-top: 6px; min-height: 14px; background: #f5f5f7; border-radius: 8px; padding: 6px 8px; } #key-status { font-size: 12px; color: #555; margin-top: 4px; min-height: 14px; } #key-status.saved { color: #1a7f37; } .hidden { display: none; } .model { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #555; }
+button { font-size: 13px; padding: 7px 14px; border-radius: 10px; border: 1px solid #d1d1d6; background: #fff; cursor: pointer; } button:hover:not(:disabled) { background: #f0f0f2; } button.primary { background: #007aff; border-color: #007aff; color: #fff; } button.primary:hover:not(:disabled) { background: #006ee6; } button:disabled { opacity: 0.45; cursor: default; }
+footer { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; } footer small { font-size: 11px; color: #888; max-width: 260px; } #error { color: #c21d16; background: #fdecea; border-radius: 8px; padding: 6px 8px; font-size: 12px; margin: 10px 0; } #error:empty { display: none; }
 </style>
 </head>
 <body>
@@ -21,9 +23,10 @@ footer { margin-top: 12px; display: flex; justify-content: space-between; align-
 <h1>Choose transcription</h1>
 <p class="sub">Your key is encrypted in your macOS user profile and never saved in settings.json.</p>
 <label for="provider">Provider</label><select id="provider"></select>
-<label>Default transcription model</label><div id="model" class="model"></div>
+<label for="model-search">Transcription model</label><input id="model-search" type="search" placeholder="Search models…" autocomplete="off" /><select id="model"></select><div id="model-hint" class="model"></div>
+<label for="language-search">Language</label><input id="language-search" type="search" placeholder="Search languages…" autocomplete="off" /><select id="language"></select><div id="language-hint" class="model"></div>
 <div id="cloudflare-fields" class="hidden"><label for="account-id">Cloudflare account ID</label><input id="account-id" autocomplete="off" /><label for="gateway-id">Gateway ID</label><input id="gateway-id" value="flow" autocomplete="off" /></div>
-<label for="token">API key</label><input id="token" type="password" autocomplete="off" />
+<label for="token">API key</label><input id="token" type="password" autocomplete="off" /><div id="key-status"></div>
 <div id="error"></div><footer><small>You can change the provider later from the tray menu.</small><button id="btn-save" class="primary">Continue</button></footer>
 </section>
 <section id="permissions-step" class="hidden">
