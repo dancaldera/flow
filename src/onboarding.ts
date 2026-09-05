@@ -4,7 +4,7 @@ type PermissionState = 'granted' | 'missing' | 'unknown'
 type ProviderModel = { id: string; label: string; blurb: string; languages: string[] }
 type Provider = { id: string; label: string; defaultModel: string; models: ProviderModel[]; needsAccountId: boolean; needsGatewayId: boolean }
 type Setup = { provider: string; model: string; language: string; configured: boolean }
-type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[] }
+type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[] }
 
 const DEFAULT_AX_HINT = 'Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.'
 
@@ -37,9 +37,10 @@ const token = document.getElementById('token') as HTMLInputElement
 const keyStatus = document.getElementById('key-status') as HTMLDivElement
 const error = document.getElementById('error') as HTMLDivElement
 const dotMic = document.getElementById('dot-mic') as HTMLSpanElement
-const dotAx = document.getElementById('dot-ax') as HTMLSpanElement
-const axHint = document.getElementById('ax-hint') as HTMLParagraphElement
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement
+const dotAx = document.getElementById('dot-ax') as HTMLSpanElement
+const dotIm = document.getElementById('dot-im') as HTMLSpanElement
+const axHint = document.getElementById('ax-hint') as HTMLParagraphElement
 const btnAx = document.getElementById('btn-ax') as HTMLButtonElement
 const btnIm = document.getElementById('btn-im') as HTMLButtonElement
 const btnSave = document.getElementById('btn-save') as HTMLButtonElement
@@ -236,10 +237,12 @@ async function refresh(): Promise<void> {
 	}
 	dotMic.className = `dot ${state.permissions.microphone}`
 	dotAx.className = `dot ${state.permissions.accessibility}`
+	dotIm.className = `dot ${state.permissions.inputMonitoring ?? 'unknown'}`
 	btnMic.disabled = state.permissions.microphone === 'granted'
 	btnMic.textContent = btnMic.disabled ? 'Enabled ✓' : 'Enable Microphone'
 	axHint.innerHTML = state.permissions.axHint ?? DEFAULT_AX_HINT
 	btnAx.textContent = state.permissions.accessibility === 'granted' ? 'Granted ✓ — re-open Settings' : 'Open Accessibility Settings'
+	btnIm.textContent = state.permissions.inputMonitoring === 'granted' ? 'Enabled ✓ — re-open Settings' : 'Open Input Monitoring Settings'
 	btnDone.disabled = !state.setup.configured || state.permissions.microphone !== 'granted' || state.permissions.accessibility !== 'granted'
 }
 

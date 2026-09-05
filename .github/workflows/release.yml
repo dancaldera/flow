@@ -43,13 +43,16 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: flow-macos-dmg
-          path: release/*.dmg
+          path: |
+            release/*.dmg
+            release/*.zip
           if-no-files-found: error
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.dmg
+          files: |
+            release/*.dmg
+            release/*.zip
           generate_release_notes: true

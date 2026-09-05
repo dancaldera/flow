@@ -29,6 +29,7 @@ let fnHelper: ChildProcess | null = null
 let flowStarted = false
 let currentPhase: FlowPhase = 'idle'
 let errorTimer: NodeJS.Timeout | null = null
+let updating = false
 let lastError: string | null = null
 
 function setState(state: FlowState): void {
@@ -63,13 +64,24 @@ function buildTrayMenu(): Menu {
 	const items: Electron.MenuItemConstructorOptions[] = [
 		{ label: 'Hold fn, speak, release', enabled: false },
 		{ label: 'Start / stop (⌥Space)', click: () => (recording ? void stopListening('toggle') : void startListening('shortcut')) },
-		{ label: 'Check for updates…', click: () => void checkForUpdates() },
 		{ type: 'separator' },
 	]
 	if (lastError) {
 		items.push({ label: `Last error: ${lastError}`, enabled: false })
 		items.push({ type: 'separator' })
 	}
+	items.push({
+		label: 'Check for updates…',
+		click: () => {
+			if (updating) return
+			updating = true
+			if (recording) cancelListening()
+			void checkForUpdates((pct) => setState({ phase: 'working', message: `Updating… ${pct}%` })).finally(() => {
+				updating = false
+				if (currentPhase === 'working') setState({ phase: 'idle' })
+			})
+		},
+	})
 	items.push(
 		{ label: 'Setup & permissions…', click: () => showOnboarding() },
 		{ label: 'How to use Flow…', click: () => showHowToUse() },
@@ -145,7 +157,7 @@ function followDock(): void {
 }
 
 async function startListening(source: string): Promise<void> {
-	if (recording || !pill) return
+	if (recording || updating || !pill) return
 	console.log(`[flow] start listening (source=${source})`)
 	recording = true
 	chunks = []

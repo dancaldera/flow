@@ -1,4 +1,5 @@
 import { app, dialog, shell } from 'electron'
+import { execFile, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -9,7 +10,8 @@ export const GITHUB_REPO = 'dancaldera/flow'
 export type ReleaseInfo = {
 	tag: string
 	version: string
-	dmgUrl: string
+	dmgUrl: string | null
+	zipUrl: string | null
 }
 
 /** Parses "v1.2.3" / "1.2.3" into [major, minor, patch]. */
@@ -26,16 +28,19 @@ export function isNewerVersion(candidate: string, current: string): boolean {
 	return c[0] !== cur[0] ? c[0] > cur[0] : c[1] !== cur[1] ? c[1] > cur[1] : c[2] > cur[2]
 }
 
-/** Picks the release DMG asset matching this machine's architecture. */
-export function pickAsset(assets: Array<{ name: string; browser_download_url: string }>, arch: string): string | null {
-	const dmgs = assets.filter((a) => a.name.toLowerCase().endsWith('.dmg'))
-	const match = dmgs.find((a) =>
-		arch === 'arm64' ? a.name.toLowerCase().endsWith('-arm64.dmg') : !a.name.toLowerCase().includes('arm64'),
+/** Picks the release asset matching this machine's architecture. */
+export function pickAsset(
+	assets: Array<{ name: string; browser_download_url: string }>,
+	arch: string,
+	ext: 'dmg' | 'zip' = 'dmg',
+): string | null {
+	const files = assets.filter((a) => a.name.toLowerCase().endsWith(`.${ext}`))
+	const match = files.find((a) =>
+		arch === 'arm64' ? a.name.toLowerCase().includes('-arm64.') : !a.name.toLowerCase().includes('arm64'),
 	)
 	return match?.browser_download_url ?? null
 }
-
-/** Fetches the latest published release; null when none has a DMG asset. */
+/** Fetches the latest published release; null when none has a mac installer. */
 export async function fetchLatestRelease(fetchImpl: typeof fetch = fetch): Promise<ReleaseInfo | null> {
 	const res = await fetchImpl(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
 		headers: { Accept: 'application/vnd.github+json' },
@@ -45,13 +50,14 @@ export async function fetchLatestRelease(fetchImpl: typeof fetch = fetch): Promi
 	const data = (await res.json()) as { tag_name?: string; assets?: Array<{ name: string; browser_download_url: string }> }
 	const tag = data.tag_name
 	if (!tag) throw new Error('GitHub API response has no tag_name')
-	const dmgUrl = pickAsset(data.assets ?? [], process.arch)
-	if (!dmgUrl) return null
-	return { tag, version: tag.replace(/^v/, ''), dmgUrl }
+	const dmgUrl = pickAsset(data.assets ?? [], process.arch, 'dmg')
+	const zipUrl = pickAsset(data.assets ?? [], process.arch, 'zip')
+	if (!dmgUrl && !zipUrl) return null
+	return { tag, version: tag.replace(/^v/, ''), dmgUrl, zipUrl }
 }
 
 /** Interactive tray-menu flow: compare, confirm, download, open the installer. */
-export async function checkForUpdates(): Promise<void> {
+export async function checkForUpdates(onProgress?: (pct: number) => void): Promise<void> {
 	let release: ReleaseInfo | null
 	try {
 		release = await fetchLatestRelease()
@@ -79,6 +85,24 @@ export async function checkForUpdates(): Promise<void> {
 		})
 		return
 	}
+	// Auto-install path: app lives in /Applications and a zip asset exists.
+	// A detached script swaps the bundle after this process exits, then relaunches.
+	const appBundle = path.resolve(path.dirname(app.getPath('exe')), '..', '..')
+	if (appBundle.startsWith('/Applications/') && release.zipUrl) {
+		const { response } = await dialog.showMessageBox({
+			type: 'question',
+			message: `Flow ${release.version} is available`,
+			detail: `You are running ${app.getVersion()}. Download and install automatically? Flow will close and reopen.`,
+			buttons: ['Install and restart', 'Cancel'],
+			defaultId: 0,
+			cancelId: 1,
+		})
+		if (response !== 0) return
+		await installFromZip(release.zipUrl, appBundle, onProgress)
+		return
+	}
+	// Fallback (dev build or no zip asset): download the DMG and open it.
+	if (!release.dmgUrl) return
 	const { response } = await dialog.showMessageBox({
 		type: 'question',
 		message: `Flow ${release.version} is available`,
@@ -89,7 +113,8 @@ export async function checkForUpdates(): Promise<void> {
 	})
 	if (response !== 0) return
 	try {
-		const dmgPath = await downloadDmg(release.dmgUrl)
+		const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-update-'))
+		const dmgPath = await downloadFile(release.dmgUrl, path.join(tmp, path.basename(new URL(release.dmgUrl).pathname)), onProgress)
 		await dialog.showMessageBox({
 			type: 'info',
 			message: 'Installer downloaded',
@@ -105,11 +130,71 @@ export async function checkForUpdates(): Promise<void> {
 	}
 }
 
-async function downloadDmg(url: string): Promise<string> {
+/** Streams url to dest, reporting percent downloaded. */
+async function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<string> {
 	const res = await fetch(url)
-	if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`)
-	const buf = Buffer.from(await res.arrayBuffer())
-	const file = path.join(os.tmpdir(), path.basename(new URL(url).pathname))
-	await fs.promises.writeFile(file, buf)
-	return file
+	if (!res.ok || !res.body) throw new Error(`Download failed: HTTP ${res.status}`)
+	const total = Number(res.headers.get('content-length') ?? 0)
+	const out = fs.createWriteStream(dest)
+	const reader = res.body.getReader()
+	let received = 0
+	let lastPct = -1
+	for (;;) {
+		const { done, value } = await reader.read()
+		if (done) break
+		received += value.byteLength
+		if (!out.write(Buffer.from(value))) await new Promise<void>((resolve) => out.once('drain', resolve))
+		if (total && onProgress) {
+			const pct = Math.min(100, Math.floor((received / total) * 100))
+			if (pct !== lastPct) {
+				lastPct = pct
+				onProgress(pct)
+			}
+		}
+	}
+	await new Promise<void>((resolve, reject) => {
+		out.end((error?: Error) => (error ? reject(error) : resolve()))
+	})
+	return dest
+}
+
+/**
+ * Downloads the zip, stages flow.app, and spawns a detached installer that
+ * waits for this process to exit, swaps /Applications/flow.app, and relaunches.
+ * The staging dir is intentionally left for the tmp cleaner — the script needs
+ * it after we quit.
+ */
+async function installFromZip(zipUrl: string, appBundle: string, onProgress?: (pct: number) => void): Promise<void> {
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-update-'))
+	try {
+		const zipPath = await downloadFile(zipUrl, path.join(tmp, path.basename(new URL(zipUrl).pathname)), onProgress)
+		onProgress?.(100)
+		await new Promise<void>((resolve, reject) => {
+			execFile('unzip', ['-q', '-o', zipPath, '-d', tmp], (error) => (error ? reject(error) : resolve()))
+		})
+		const staged = path.join(tmp, 'flow.app')
+		if (!fs.existsSync(staged)) throw new Error('Update archive did not contain flow.app')
+		const pid = process.pid
+		const script = path.join(tmp, 'install.sh')
+		fs.writeFileSync(
+			script,
+			`#!/bin/sh
+while kill -0 ${pid} 2>/dev/null; do sleep 0.3; done
+sleep 0.5
+rm -rf '${appBundle}'
+cp -R '${staged}' '${appBundle}'
+open '${appBundle}'
+`,
+		)
+		fs.chmodSync(script, 0o755)
+		const child = spawn('/bin/sh', [script], { detached: true, stdio: 'ignore' })
+		child.unref()
+		app.quit()
+	} catch (error) {
+		void dialog.showMessageBox({
+			type: 'warning',
+			message: 'Update failed',
+			detail: error instanceof Error ? error.message : String(error),
+		})
+	}
 }

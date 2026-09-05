@@ -28,8 +28,10 @@
       },
       "hardenedRuntime": false,
       "target": [
-        "dmg"
-      ]
+        "dmg",
+        "zip"
+      ],
+      "identity": "-"
     }
   },
   "description": "Flow — lean open-source push-to-talk dictation for macOS (fn to talk, Gateway STT, paste at cursor).",

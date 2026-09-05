@@ -8,6 +8,7 @@ export type PermissionState = 'granted' | 'missing' | 'unknown'
 export interface PermissionReport {
 	microphone: PermissionState
 	accessibility: PermissionState
+	inputMonitoring?: PermissionState
 	axHint?: string
 }
 
@@ -71,7 +72,9 @@ export function fnHelperPath(): string {
  * (accessibilityStatus) is not used here — in dev it reports the dev
  * launcher's trust, which says nothing about the helper.
  */
-export async function fnTapState(binary: string = fnHelperPath()): Promise<{ state: PermissionState; hint?: string }> {
+export async function fnTapState(
+	binary: string = fnHelperPath(),
+): Promise<{ state: PermissionState; hint?: string; needsInputMonitoring?: boolean }> {
 	if (!fs.existsSync(binary)) {
 		return {
 			state: 'unknown',
@@ -82,18 +85,37 @@ export async function fnTapState(binary: string = fnHelperPath()): Promise<{ sta
 	}
 	try {
 		await new Promise<void>((resolve, reject) => {
-			execFile(binary, ['--check'], { timeout: 5000 }, (error) => (error ? reject(error) : resolve()))
+			execFile(binary, ['--check'], { timeout: 5000 }, (error) => {
+				if (!error) return resolve()
+				const err = error as NodeJS.ErrnoException
+				const wrapped = new Error(err.message ?? 'fn check failed') as Error & { code?: number }
+				wrapped.code = typeof err.code === 'number' ? err.code : undefined
+				reject(wrapped)
+			})
 		})
 		return { state: 'granted' }
 	} catch (error) {
-		if (error && typeof error === 'object' && 'killed' in error && error.killed) return { state: 'unknown' }
+		const err = error as Error & { code?: number; killed?: boolean }
+		if (err.killed) return { state: 'unknown' }
+		if (err.code === 3) {
+			return {
+				state: 'missing',
+				needsInputMonitoring: true,
+				hint: 'macOS hides <b>real</b> fn key presses behind Input Monitoring — Accessibility alone is not enough. Toggle Flow on in the Input Monitoring list.',
+			}
+		}
 		return { state: 'missing' }
 	}
 }
 
 export async function report(): Promise<PermissionReport> {
 	const fn = await fnTapState()
-	return { microphone: microphoneStatus(), accessibility: fn.state, axHint: fn.hint }
+	return {
+		microphone: microphoneStatus(),
+		accessibility: fn.state,
+		inputMonitoring: fn.needsInputMonitoring ? 'missing' : fn.state === 'granted' ? 'granted' : 'unknown',
+		axHint: fn.hint,
+	}
 }
 
 export function allGranted(r: PermissionReport): boolean {

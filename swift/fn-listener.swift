@@ -13,6 +13,17 @@ import Cocoa
 // the fn-key capability honestly instead of probing another process.
 let checkOnly = CommandLine.arguments.contains("--check")
 
+// Input Monitoring gates delivery of REAL hardware key events (macOS 10.15+):
+// Accessibility alone creates the tap, but physical fn presses never arrive.
+// Synthetic CGEvents are delivered regardless, which hides the problem.
+if CGPreflightListenEventAccess() == false {
+	if checkOnly {
+		fputs("flow-fn-listener: Input Monitoring not granted\n", stderr)
+		exit(3)
+	}
+	CGRequestListenEventAccess() // one-time system prompt
+}
+
 let fnMask: UInt64 = 0x800000 // kCGEventFlagMaskSecondaryFn
 var isDown = false
 

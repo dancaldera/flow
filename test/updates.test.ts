@@ -32,6 +32,7 @@ describe('pickAsset', () => {
 		{ name: 'flow-0.2.0.dmg', browser_download_url: 'https://x/flow-0.2.0.dmg' },
 		{ name: 'flow-0.2.0-arm64.dmg', browser_download_url: 'https://x/flow-0.2.0-arm64.dmg' },
 		{ name: 'flow-0.2.0.zip', browser_download_url: 'https://x/flow-0.2.0.zip' },
+		{ name: 'flow-0.2.0-arm64.zip', browser_download_url: 'https://x/flow-0.2.0-arm64.zip' },
 	]
 
 	it('picks the arm64 DMG on arm64', () => {
@@ -44,5 +45,15 @@ describe('pickAsset', () => {
 
 	it('returns null when no DMG exists', () => {
 		expect(pickAsset([{ name: 'flow.zip', browser_download_url: 'https://x' }], 'arm64')).toBeNull()
+	})
+
+	it('picks zip assets per arch for auto-update', () => {
+		const withZips = [
+			...assets,
+			{ name: 'flow-0.2.0.zip', browser_download_url: 'https://x/flow-0.2.0.zip' },
+			{ name: 'flow-0.2.0-arm64.zip', browser_download_url: 'https://x/flow-0.2.0-arm64.zip' },
+		]
+		expect(pickAsset(withZips, 'arm64', 'zip')).toBe('https://x/flow-0.2.0-arm64.zip')
+		expect(pickAsset(withZips, 'x64', 'zip')).toBe('https://x/flow-0.2.0.zip')
 	})
 })

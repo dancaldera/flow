@@ -26,7 +26,7 @@ function setUI(phase: string, message?: string, seconds?: number): void {
 		hint.textContent = seconds ? `Listening… ${seconds}s` : 'Listening…'
 	} else if (phase === 'working') {
 		dot.className = 'dot busy'
-		hint.textContent = 'Transcribing…'
+		hint.textContent = message ?? 'Transcribing…'
 	} else if (phase === 'error') {
 		dot.className = 'dot err'
 		hint.textContent = message ?? 'Something went wrong'
