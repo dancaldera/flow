@@ -23,7 +23,8 @@ jobs:
       - run: pnpm build
 
   package:
-    # Every merge to main yields an installable DMG (unsigned, ad-hoc).
+    # Every merge to main yields an installable DMG (ad-hoc; releases get the
+    # real cert signing in release.yml when CSC secrets are configured).
     # Download it from the run's Artifacts section.
     needs: test
     if: github.event_name == 'push'
@@ -36,7 +37,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run package
+      - run: pnpm exec electron-builder build --mac --publish never -c.mac.identity=-
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
