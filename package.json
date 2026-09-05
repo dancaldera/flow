@@ -1,5 +1,5 @@
 {
-  "author": "",
+  "productName": "Flow",
   "build": {
     "appId": "com.flow.dictation",
     "asar": true,
