@@ -202,7 +202,31 @@ describe('other STT providers', () => {
 		vi.stubGlobal('fetch', fetchMock)
 		await expect(new DeepgramStt('tok', 'nova-3').transcribe(audio)).resolves.toBe('deep gram')
 		expect(fetchMock.mock.calls[0]?.[0]).toContain('model=nova-3')
+		expect(fetchMock.mock.calls[0]?.[0]).toContain('dictation=true')
+		expect(fetchMock.mock.calls[0]?.[0]).toContain('punctuate=true')
 		expect((fetchMock.mock.calls[0]?.[1].headers as Record<string, string>).Authorization).toBe('Token tok')
+		vi.unstubAllGlobals()
+	})
+
+	it('omits dictation for non-Nova-3 models and non-English requests', async () => {
+		const fetchMock = vi.fn().mockImplementation(async () =>
+			Response.json({ results: { channels: [{ alternatives: [{ transcript: 'hola' }] }] } }),
+		)
+		vi.stubGlobal('fetch', fetchMock)
+		await new DeepgramStt('tok', 'nova-2').transcribe(audio)
+		await new DeepgramStt('tok', 'nova-3').transcribe({ ...audio, language: 'es' })
+		for (const call of fetchMock.mock.calls) {
+			expect(String(call[0])).not.toContain('dictation')
+		}
+		vi.unstubAllGlobals()
+	})
+
+	it('surfaces Deepgram err_msg instead of the HTTP statusText', async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(new Response(JSON.stringify({ err_code: 'INVALID_QUERY', err_msg: 'Bad Request: punctuate required' }), { status: 400 }))
+		vi.stubGlobal('fetch', fetchMock)
+		await expect(new DeepgramStt('tok', 'nova-3').transcribe(audio)).rejects.toThrow('Bad Request: punctuate required (INVALID_QUERY)')
 		vi.unstubAllGlobals()
 	})
 

@@ -50,14 +50,17 @@ export class SttError extends Error {
 	}
 }
 
-type ErrorResponse = { error?: { message?: string } | string; message?: string }
+type ErrorResponse = { error?: { message?: string } | string; message?: string; err_msg?: string; err_code?: string }
 
 async function readJson(response: Response): Promise<Record<string, unknown>> {
 	return (await response.json().catch(() => ({}))) as Record<string, unknown>
 }
 
 function errorMessage(body: ErrorResponse, fallback: string): string {
-	return typeof body.error === 'string' ? body.error : (body.error?.message ?? body.message ?? fallback)
+	// Deepgram reports failures as { err_code, err_msg } — surface the real reason
+	// instead of the HTTP statusText ("Bad Request").
+	const deepgram = body.err_msg ? (body.err_code ? `${body.err_msg} (${body.err_code})` : body.err_msg) : undefined
+	return typeof body.error === 'string' ? body.error : (body.error?.message ?? body.message ?? deepgram ?? fallback)
 }
 
 async function ensureResponse(response: Response, provider: string): Promise<Record<string, unknown>> {
@@ -172,8 +175,15 @@ export class DeepgramStt implements SttProvider {
 	) {}
 
 	async transcribe(input: TranscribeInput): Promise<string> {
-		if (!this.token) throw new SttError('auth', 'Missing Deepgram API key.')
-		const params = new URLSearchParams({ model: this.model, smart_format: 'true', dictation: 'true' })
+		// Dictation mode (spoken "comma" → ",") is English-only and a Nova-3
+		// feature; other models/languages reject it with 400. It also REQUIRES
+		// punctuate=true in the same request.
+		const dictation = this.model.startsWith('nova-3') && (!input.language || input.language.startsWith('en'))
+		const params = new URLSearchParams({ model: this.model, smart_format: 'true' })
+		if (dictation) {
+			params.set('dictation', 'true')
+			params.set('punctuate', 'true')
+		}
 		if (input.language) params.set('language', input.language)
 		let response: Response
 		try {
