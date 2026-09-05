@@ -15,7 +15,7 @@ pnpm test    # vitest run — unit tests only, fast
 pnpm build   # tsc emit + CJS-prelude strip; required before pnpm start
 pnpm dev     # watch loop: rebuild + restart Electron on change
 pnpm start   # one-shot build and run the app
-pnpm run package  # electron-builder DMG (unsigned), outputs to release/
+pnpm run package  # electron-builder DMG (Apple Development signed), outputs to release/
 ```
 
 There is no linter/formatter configured — `biome.json` exists but no script wires it; do not add one unprompted.
@@ -39,7 +39,8 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - Shared constants between main and renderer live in `src/ipc.ts`; if the renderer needs one it cannot import, duplicate it with a comment pointing at the source (see `ERROR_VISIBLE_MS` in `src/renderer.ts`).
 - Pill geometry constants (`PILL_HEIGHT`, `PILL_BOTTOM_GAP`, `FULLSCREEN_PAD`) in `src/main/pillWindow.ts` are asserted in `test/pillWindow.test.ts` — update tests when changing placement.
 
-- Apps are **ad-hoc signed** (`-c.mac.identity=-`, hardenedRuntime off). Do NOT sign with hardened runtime without a real cert: library validation then rejects the Electron Framework ("different Team IDs" → app won't launch). Do NOT revert to `identity=null`: unsigned quarantined apps get the unrecoverable Gatekeeper "damaged" error; ad-hoc gets the bypassable "unidentified developer" one.
+- Apps are signed with the user's **Apple Development certificate** (`build.mac.identity` in `package.json`, hardenedRuntime off). Stable signing is what keeps macOS TCC permissions (mic, accessibility, input monitoring) and the `safeStorage` Keychain entry across reinstalls — ad-hoc signing (`identity: "-"`) changes the cdhash every build, so macOS treats each release as a new app and resets both. Do NOT revert to ad-hoc locally or to `identity=null` (unsigned quarantined apps get the unrecoverable Gatekeeper "damaged" error).
+- The Apple Development cert expires yearly — renew via Xcode (free Apple ID) before release builds start failing `security find-identity`.
 
 ## Verification
 
@@ -51,8 +52,7 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 
 - Main branch, small commits, push directly (no PR required for solo work).
 - Versions: semver in `package.json`. Release = `pnpm version patch|minor|major && git push --follow-tags` → CI builds DMGs and publishes a GitHub Release. Tag must match `package.json` or the release job fails.
-- CI: PRs/pushes to `main` run check+test+build; pushes to `main` also produce installable DMG artifacts (`.github/workflows/ci.yml`, `.github/workflows/release.yml`).
-- Builds are unsigned (ad-hoc); do not add signing secrets or config without an explicit ask.
+- Release CI signs with the Apple Development cert only when `CSC_LINK` + `CSC_KEY_PASSWORD` GitHub secrets are set; without them it falls back to ad-hoc (build succeeds, but installed releases reset TCC permissions). CI builds (PR/push, `ci.yml`) stay ad-hoc.
 
 ## Gotchas
 

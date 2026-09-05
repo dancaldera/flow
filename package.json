@@ -20,7 +20,7 @@
       "swift/flow-fullscreen-check"
     ],
     "mac": {
-      "category": "public.app-category.productivity",
+      "identity": "Apple Development: Brayan Caldera (G89N5QJ3Y3)",
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": {
@@ -30,8 +30,7 @@
       "target": [
         "dmg",
         "zip"
-      ],
-      "identity": "-"
+      ]
     }
   },
   "description": "Flow — lean open-source push-to-talk dictation for macOS (fn to talk, Gateway STT, paste at cursor).",
@@ -53,7 +52,7 @@
     "build": "tsc && node scripts/strip-cjs-prelude.js",
     "check": "tsc --noEmit",
     "dev": "node scripts/dev.js",
-    "package": "npm run build && electron-builder build --mac -c.mac.identity=- --publish never",
+    "package": "npm run build && electron-builder build --mac --publish never",
     "start": "npm run build && electron .",
     "test": "vitest run"
   },
