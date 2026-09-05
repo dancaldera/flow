@@ -39,6 +39,8 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - Shared constants between main and renderer live in `src/ipc.ts`; if the renderer needs one it cannot import, duplicate it with a comment pointing at the source (see `ERROR_VISIBLE_MS` in `src/renderer.ts`).
 - Pill geometry constants (`PILL_HEIGHT`, `PILL_BOTTOM_GAP`, `FULLSCREEN_PAD`) in `src/main/pillWindow.ts` are asserted in `test/pillWindow.test.ts` — update tests when changing placement.
 
+- Apps are **ad-hoc signed** (`-c.mac.identity=-`, hardenedRuntime off). Do NOT sign with hardened runtime without a real cert: library validation then rejects the Electron Framework ("different Team IDs" → app won't launch). Do NOT revert to `identity=null`: unsigned quarantined apps get the unrecoverable Gatekeeper "damaged" error; ad-hoc gets the bypassable "unidentified developer" one.
+
 ## Verification
 
 - `pnpm check && pnpm test` after every change; both must pass before committing.

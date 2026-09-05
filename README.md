@@ -86,7 +86,7 @@ pnpm version patch   # or minor / major — commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
-The release workflow verifies the tag matches `package.json`, builds the DMGs, and publishes a GitHub Release with auto-generated notes. Builds are currently unsigned (ad-hoc); macOS Gatekeeper requires right-click → Open on first launch. To sign, add `MAC_CERTIFICATE_P12`/`MAC_CERTIFICATE_PASSWORD` secrets and electron-builder signing env to `.github/workflows/release.yml`.
+Builds are ad-hoc signed (no Apple Developer cert). macOS Gatekeeper blocks first launch with "cannot verify the developer" — right-click the app → **Open**, or System Settings → **Privacy & Security** → **Open Anyway**. After reinstalling, macOS may ask once to re-grant Microphone/Accessibility and to re-enter the provider API key (the signing identity changed). To distribute with zero prompts you need a Developer ID certificate + notarization: add the cert secrets and electron-builder signing env to `.github/workflows/release.yml`.
 
 ## Privacy
 
