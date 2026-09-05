@@ -29,7 +29,8 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - `src/renderer.ts` + `index.html` + `styles/pill.css` — pill UI + mic capture. The renderer loads as a plain `<script src>` — it CANNOT import modules compiled to CJS (no `require`); keep it dependency-free or the build's strip step fails.
 - `src/ipc.ts` — shared IPC channel names + types; safe to import from main AND renderer (pure types/constants only).
 - `swift/` — native helpers (`fn` tap, fullscreen check); prebuilt binaries are committed, `asarUnpack`ed at package time.
-- `test/` — Vitest. Tests exist for `pillWindow.ts`, `permissions-fn`, `stt`. Pure logic only — no Electron runtime in tests.
+- `src/main/updates.ts` — in-app updater: pure helpers (version compare, asset pick) unit-tested; `checkForUpdates()` is the tray-menu flow (public GitHub API, no token).
+- `test/` — Vitest. Tests exist for `pillWindow.ts`, `permissions-fn`, `stt`, `updates`. Pure logic only — no Electron runtime in tests.
 
 ## Conventions
 

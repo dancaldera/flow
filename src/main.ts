@@ -3,6 +3,7 @@ import * as path from 'node:path'
 import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
 import { ERROR_VISIBLE_MS, IPC_CHANNELS, type FlowPhase, type FlowState } from './ipc'
 import { insertTextAtCursor } from './main/inserter'
+import { checkForUpdates } from './main/updates'
 import {
 	allGranted,
 	fnHelperPath,
@@ -62,6 +63,7 @@ function buildTrayMenu(): Menu {
 	const items: Electron.MenuItemConstructorOptions[] = [
 		{ label: 'Hold fn, speak, release', enabled: false },
 		{ label: 'Start / stop (⌥Space)', click: () => (recording ? void stopListening('toggle') : void startListening('shortcut')) },
+		{ label: 'Check for updates…', click: () => void checkForUpdates() },
 		{ type: 'separator' },
 	]
 	if (lastError) {
