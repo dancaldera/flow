@@ -44,12 +44,17 @@ jobs:
             echo "$CSC_LINK" | base64 --decode > /tmp/flow-cert.p12
             openssl pkcs12 -in /tmp/flow-cert.p12 -passin pass:"$CSC_KEY_PASSWORD" -clcerts -nokeys 2>/dev/null \
               | openssl x509 > /tmp/flow-cert.pem
-            security create-keychain -p flowbuild flowbuild.keychain
-            security import /tmp/flow-cert.p12 -k flowbuild.keychain -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple: -s -k flowbuild flowbuild.keychain
+            security create-keychain -p flowbuild "$PWD/flowbuild.keychain"
+            security unlock-keychain -p flowbuild "$PWD/flowbuild.keychain"
+            security import /tmp/flow-cert.p12 -k "$PWD/flowbuild.keychain" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple: -s -k flowbuild "$PWD/flowbuild.keychain" > /dev/null
             security list-keychains -d user -s $(security list-keychains -d user | tr -d '"' | tr '\n' ' ') "$PWD/flowbuild.keychain"
+            echo "--- identities found (pre-trust):"
+            security find-identity -p codesigning || true
             sudo security add-trusted-cert -d -r trustRoot -p codeSign \
               -k /Library/Keychains/System.keychain /tmp/flow-cert.pem
+            echo "--- identities found (post-trust):"
+            security find-identity -v -p codesigning || true
             unset CSC_LINK
             pnpm exec electron-builder build --mac --x64 --arm64 --publish never
             rm -f /tmp/flow-cert.p12 /tmp/flow-cert.pem
