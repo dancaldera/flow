@@ -20,7 +20,7 @@
       "swift/flow-fullscreen-check"
     ],
     "mac": {
-      "identity": "Apple Development: Brayan Caldera (G89N5QJ3Y3)",
+      "identity": "Flow",
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": {

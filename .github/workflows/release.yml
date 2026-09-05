@@ -34,7 +34,7 @@ jobs:
             exit 1
           fi
 
-      # Signs with the Apple Development cert when CSC_LINK/CSC_KEY_PASSWORD
+      # Signs with the project's self-signed "Flow" cert when CSC_LINK/CSC_KEY_PASSWORD
       # secrets are set (stable TCC permissions + Keychain across releases);
       # falls back to ad-hoc so the job still succeeds without secrets.
       - name: Build DMGs (arm64 + x64)
