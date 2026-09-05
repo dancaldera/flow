@@ -73,6 +73,21 @@ Electron alone cannot bind single-`fn`; see [`globalShortcut`](https://www.elect
 - `swift/fn-listener.swift` — native `fn` tap.
 - `test/` — Vitest seam tests.
 
+
+## Versioning & releases
+
+Versions follow semver in `package.json`; git tags (`v*`) drive releases.
+
+- **PRs / pushes to `main`** — CI typechecks, tests, and compiles. Every push to `main` also packages an unsigned macOS DMG (arm64 + x64) as a run artifact: open the Actions run → Artifacts → installable `.dmg`.
+- **Releases** — cut one by bumping the version and pushing the tag:
+
+```bash
+pnpm version patch   # or minor / major — commits and tags vX.Y.Z
+git push --follow-tags
+```
+
+The release workflow verifies the tag matches `package.json`, builds the DMGs, and publishes a GitHub Release with auto-generated notes. Builds are currently unsigned (ad-hoc); macOS Gatekeeper requires right-click → Open on first launch. To sign, add `MAC_CERTIFICATE_P12`/`MAC_CERTIFICATE_PASSWORD` secrets and electron-builder signing env to `.github/workflows/release.yml`.
+
 ## Privacy
 
 Mic audio never leaves the machine except the single STT POST. Keys live in Keychain/env, never in git.
