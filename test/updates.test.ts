@@ -56,4 +56,13 @@ describe('pickAsset', () => {
 		expect(pickAsset(withZips, 'arm64', 'zip')).toBe('https://x/flow-0.2.0-arm64.zip')
 		expect(pickAsset(withZips, 'x64', 'zip')).toBe('https://x/flow-0.2.0.zip')
 	})
+
+	it('matches electron-builder zip names with the -mac suffix', () => {
+		const real = [
+			{ name: 'flow-0.2.4-arm64-mac.zip', browser_download_url: 'https://x/flow-0.2.4-arm64-mac.zip' },
+			{ name: 'flow-0.2.4-mac.zip', browser_download_url: 'https://x/flow-0.2.4-mac.zip' },
+		]
+		expect(pickAsset(real, 'arm64', 'zip')).toBe('https://x/flow-0.2.4-arm64-mac.zip')
+		expect(pickAsset(real, 'x64', 'zip')).toBe('https://x/flow-0.2.4-mac.zip')
+	})
 })

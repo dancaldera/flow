@@ -36,7 +36,7 @@ export function pickAsset(
 ): string | null {
 	const files = assets.filter((a) => a.name.toLowerCase().endsWith(`.${ext}`))
 	const match = files.find((a) =>
-		arch === 'arm64' ? a.name.toLowerCase().includes('-arm64.') : !a.name.toLowerCase().includes('arm64'),
+		arch === 'arm64' ? a.name.toLowerCase().includes('-arm64') : !a.name.toLowerCase().includes('arm64'),
 	)
 	return match?.browser_download_url ?? null
 }
