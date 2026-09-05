@@ -86,7 +86,11 @@ pnpm version patch   # or minor / major — commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
-Builds are ad-hoc signed (no Apple Developer cert). macOS Gatekeeper blocks first launch with "cannot verify the developer" — right-click the app → **Open**, or System Settings → **Privacy & Security** → **Open Anyway**. After reinstalling, macOS may ask once to re-grant Microphone/Accessibility and to re-enter the provider API key (the signing identity changed). To distribute with zero prompts you need a Developer ID certificate + notarization: add the cert secrets and electron-builder signing env to `.github/workflows/release.yml`.
+Builds are ad-hoc signed (no Apple Developer cert). macOS Gatekeeper blocks first launch with "cannot verify the developer" — right-click the app → **Open**, or System Settings → **Privacy & Security** → **Open Anyway**. Ad-hoc signatures change per build, so macOS may ask once per update to re-grant Microphone/Accessibility/Input Monitoring and to re-enter the provider API key. To distribute with zero prompts you need a Developer ID certificate + notarization: add the cert secrets and electron-builder signing env to `.github/workflows/release.yml`.
+
+**Updating:** the tray menu → **Check for updates…** compares against the latest GitHub release. If the app lives in `/Applications`, it downloads the matching zip (progress % shows on the pill), swaps the bundle, and relaunches automatically. Otherwise it downloads the DMG for a manual drag-install.
+
+**fn hotkey:** requires **Accessibility** (tap creation) **and Input Monitoring** (delivery of real hardware key presses — synthetic events are delivered without it, which hides the problem). The helper preflights Input Monitoring via `CGPreflightListenEventAccess`; the setup window shows its real status.
 
 ## Privacy
 
