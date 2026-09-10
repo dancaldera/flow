@@ -6,9 +6,10 @@ import Cocoa
 // fullscreen: "1" when a normal window covers the whole main display, else "0".
 // frame W/H:  main display size in points.
 // vis X/Y/W/H: usable area (visibleFrame) in top-left origin, relative to the
-//              main display. Over fullscreen the visibleFrame of a background
-//              process is stale (it still excludes the pre-fullscreen Dock),
-//              so the caller uses the full frame instead.
+//              main display. It may be stale over a true fullscreen space
+//              (still excluding the pre-fullscreen Dock); the caller trusts
+//              it anyway, since a covering window is usually not fullscreen
+//              and the Dock is usually still there.
 //
 // A long-running Electron process caches display metrics and goes stale after
 // Dock and fullscreen changes; a fresh Cocoa process reads the real values,

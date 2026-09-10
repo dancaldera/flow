@@ -61,7 +61,7 @@ export function openInputMonitoringSettings(): void {
 }
 
 export function fnHelperPath(): string {
-	// Same unpack rule as fullscreenCheckPath in main.ts: spawnSync cannot
+	// Same unpack rule as fullscreenCheckPath in main.ts: child processes cannot
 	// execute from inside the asar archive.
 	return path.join(app.getAppPath().replace('app.asar', 'app.asar.unpacked'), 'swift', 'flow-fn-listener')
 }

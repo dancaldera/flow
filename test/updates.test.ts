@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isNewerVersion, parseVersion, pickAsset } from '../src/main/updates'
+import { buildUpdateInstallScript, isNewerVersion, parseVersion, pickAsset } from '../src/main/updates'
 
 describe('parseVersion', () => {
 	it('parses with and without a leading v', () => {
@@ -64,5 +64,19 @@ describe('pickAsset', () => {
 		]
 		expect(pickAsset(real, 'arm64', 'zip')).toBe('https://x/flow-0.2.4-arm64-mac.zip')
 		expect(pickAsset(real, 'x64', 'zip')).toBe('https://x/flow-0.2.4-mac.zip')
+	})
+})
+
+describe('buildUpdateInstallScript', () => {
+	it('takes pid and paths as argv, never interpolated into shell source', () => {
+		const script = buildUpdateInstallScript()
+		// Destinations travel quoted as "$1"/"$2"/"$3" — a path containing a
+		// quote or whitespace can't break out of them.
+		expect(script).toContain('"$1"')
+		expect(script).toContain('"$2"')
+		expect(script).toContain('"$3"')
+		expect(script).not.toMatch(/rm -rf '\$/)
+		expect(script).toContain('rm -rf "$3"')
+		expect(script).toContain('cp -R "$2" "$3"')
 	})
 })

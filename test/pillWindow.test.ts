@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDockVisible, parseScreenTruth, placePillBottomCenter, type ScreenTruth } from '../src/main/pillWindow'
+import { isDockVisible, parseScreenTruth, placePillBottomCenter, placementKey, shouldHugBottom, type ScreenTruth } from '../src/main/pillWindow'
 
 // macOS pins the top edge of an auxiliary window at y=784 on a fullscreen
 // space while the Dock is enabled (measured on a 1440x900 display, Dock
@@ -107,12 +107,12 @@ describe('parseScreenTruth', () => {
 		})
 	})
 
-	it('uses the full frame as workArea over fullscreen', () => {
-		// The sidecar's visibleFrame is stale over fullscreen; the parser must
-		// substitute the full frame so the pill anchors to the true bottom.
+	it('keeps the reported usable area as workArea over fullscreen', () => {
+		// A covering window is not a fullscreen space: discarding the fresh
+		// usable area hid the pill behind still-visible Docks. Trust it.
 		const t = parseScreenTruth('1 1440 900 0 30 1440 786')
 		expect(t?.fullscreen).toBe(true)
-		expect(t?.workArea).toEqual({ x: 0, y: 0, width: 1440, height: 900 })
+		expect(t?.workArea).toEqual({ x: 0, y: 30, width: 1440, height: 786 })
 	})
 
 	it('rejects malformed output', () => {
@@ -120,5 +120,49 @@ describe('parseScreenTruth', () => {
 		expect(parseScreenTruth('1 1440')).toBeNull()
 		expect(parseScreenTruth('1 1440 900 0 30 NaN 786')).toBeNull()
 		expect(parseScreenTruth('')).toBeNull()
+	})
+})
+
+describe('shouldHugBottom', () => {
+	it('anchors to the work area when the Dock is visible', () => {
+		expect(shouldHugBottom(truth({ workArea: { x: 0, y: 25, width: 1440, height: 875 - 84 } }))).toBe(false)
+	})
+
+	it('hugs the screen bottom when the Dock is hidden', () => {
+		// Menu bar only: workArea bottom flush with the screen bottom.
+		expect(shouldHugBottom(truth())).toBe(true)
+	})
+
+	it('does not hug over fullscreen when the workArea shows a Dock', () => {
+		// Covering windows trip the fullscreen flag while the Dock stays
+		// visible; hugging would park the pill behind it. Worst case the
+		// workArea is stale-short and the pill floats slightly.
+		expect(shouldHugBottom(truth({ fullscreen: true, workArea: { x: 0, y: 30, width: 1440, height: 786 } }))).toBe(false)
+	})
+})
+
+describe('placementKey', () => {
+	it('changes when geometry or hug mode changes, and only then', () => {
+		const base = truth()
+		expect(placementKey(base, false)).toBe(placementKey(truth(), false))
+		expect(placementKey(base, false)).not.toBe(placementKey(base, true))
+		expect(placementKey(base, false)).not.toBe(
+			placementKey(truth({ workArea: { x: 0, y: 25, width: 1440, height: 791 } }), false),
+		)
+	})
+})
+
+describe('covering window with a visible Dock (regression)', () => {
+	it('sits above the Dock instead of hugging the screen bottom', () => {
+		// Captured on a 1440x900 display: a borderless window covers the
+		// screen (fullscreen=1) while the Dock is visible (usable area
+		// excludes 76px at the bottom). A covering window is not a
+		// fullscreen space — the pill must clear the Dock top (y=824).
+		const t = parseScreenTruth('1 1440 900 0 30 1440 794')
+		expect(t?.fullscreen).toBe(true)
+		expect(t && shouldHugBottom(t)).toBe(false)
+		const win = fakeWindow()
+		placePillBottomCenter(win as never, t!, { hugBottom: shouldHugBottom(t!) })
+		expect(win.pos[1] + win.size[1]).toBeLessThanOrEqual(824 - 12)
 	})
 })

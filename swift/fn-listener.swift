@@ -33,10 +33,19 @@ func emit(_ s: String) {
 }
 
 let mask = (1 << CGEventType.flagsChanged.rawValue) | (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+// Held outside the callback so the timeout handler can re-enable the tap;
+// without re-enabling, one timeout would silence fn until restart.
+var eventTap: CFMachPort?
 guard let tap = CGEvent.tapCreate(
 	tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
 	eventsOfInterest: CGEventMask(mask),
 	callback: { _, type, event, _ -> Unmanaged<CGEvent>? in
+		if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+			if let t = eventTap {
+				CGEvent.tapEnable(tap: t, enable: true)
+			}
+			return nil
+		}
 		if type == .flagsChanged {
 			let flags = event.flags.rawValue
 			let down = (flags & fnMask) != 0
@@ -45,15 +54,13 @@ guard let tap = CGEvent.tapCreate(
 				emit(down ? "down" : "up")
 			}
 		}
-		if type == .tapDisabledByTimeout {
-			return nil
-		}
 		return Unmanaged.passRetained(event)
 	}, userInfo: nil
 ) else {
 	fputs("flow-fn-listener: CGEventTap denied (enable Accessibility)\n", stderr)
 	exit(1)
 }
+eventTap = tap
 
 if checkOnly {
 	print("flow-fn-listener: event tap ok")

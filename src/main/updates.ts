@@ -159,6 +159,21 @@ async function downloadFile(url: string, dest: string, onProgress?: (pct: number
 }
 
 /**
+ * Detached installer body. Paths travel as argv ($1 = pid to wait for,
+ * $2 = staged bundle, $3 = destination bundle) so no path is ever
+ * interpolated into shell source — quoting can't break or inject.
+ */
+export function buildUpdateInstallScript(): string {
+	return `#!/bin/sh
+while kill -0 "$1" 2>/dev/null; do sleep 0.3; done
+sleep 0.5
+rm -rf "$3"
+cp -R "$2" "$3"
+open "$3"
+`
+}
+
+/**
  * Downloads the zip, stages flow.app, and spawns a detached installer that
  * waits for this process to exit, swaps /Applications/flow.app, and relaunches.
  * The staging dir is intentionally left for the tmp cleaner — the script needs
@@ -174,20 +189,10 @@ async function installFromZip(zipUrl: string, appBundle: string, onProgress?: (p
 		})
 		const staged = path.join(tmp, 'flow.app')
 		if (!fs.existsSync(staged)) throw new Error('Update archive did not contain flow.app')
-		const pid = process.pid
 		const script = path.join(tmp, 'install.sh')
-		fs.writeFileSync(
-			script,
-			`#!/bin/sh
-while kill -0 ${pid} 2>/dev/null; do sleep 0.3; done
-sleep 0.5
-rm -rf '${appBundle}'
-cp -R '${staged}' '${appBundle}'
-open '${appBundle}'
-`,
-		)
+		fs.writeFileSync(script, buildUpdateInstallScript())
 		fs.chmodSync(script, 0o755)
-		const child = spawn('/bin/sh', [script], { detached: true, stdio: 'ignore' })
+		const child = spawn('/bin/sh', [script, String(process.pid), staged, appBundle], { detached: true, stdio: 'ignore' })
 		child.unref()
 		app.quit()
 	} catch (error) {

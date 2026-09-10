@@ -86,7 +86,7 @@ pnpm version patch   # or minor / major — commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
-Builds are ad-hoc signed (no Apple Developer cert). macOS Gatekeeper blocks first launch with "cannot verify the developer" — right-click the app → **Open**, or System Settings → **Privacy & Security** → **Open Anyway**. Ad-hoc signatures change per build, so macOS may ask once per update to re-grant Microphone/Accessibility/Input Monitoring and to re-enter the provider API key. To distribute with zero prompts you need a Developer ID certificate + notarization: add the cert secrets and electron-builder signing env to `.github/workflows/release.yml`.
+Builds are signed with the project's self-signed **"Flow"** certificate (no Apple Developer cert, no notarization). First launch still needs right-click → **Open** (or System Settings → **Privacy & Security** → **Open Anyway**), but the stable signing identity keeps Microphone/Accessibility/Input Monitoring grants and the Keychain-stored API key across updates. Per-push CI DMGs are ad-hoc signed, and releases fall back to ad-hoc if the `CSC_LINK`/`CSC_KEY_PASSWORD` secrets are unset — ad-hoc signatures change every build, so those installs re-prompt for permissions and the API key on each update.
 
 **Updating:** the tray menu → **Check for updates…** compares against the latest GitHub release. If the app lives in `/Applications`, it downloads the matching zip (progress % shows on the pill), swaps the bundle, and relaunches automatically. Otherwise it downloads the DMG for a manual drag-install.
 

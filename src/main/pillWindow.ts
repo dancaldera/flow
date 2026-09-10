@@ -70,8 +70,10 @@ export type ScreenTruth = {
 }
 
 // Parses the sidecar line "<fs> <frameW> <frameH> <visX> <visY> <visW> <visH>".
-// Over fullscreen the sidecar's visibleFrame is stale (still excludes the
-// pre-fullscreen Dock), so the full frame is used as the work area.
+// The reported usable area is trusted as-is, even over fullscreen: a
+// covering window (borderless terminal, overlay, screen sharing) is not a
+// fullscreen space, and the Dock is usually still there. Worst case the
+// workArea is stale-short and the pill floats slightly — visible, not lost.
 export function parseScreenTruth(out: string): ScreenTruth | null {
 	const parts = out.trim().split(/\s+/).map(Number)
 	if (parts.length !== 7 || parts.some((n) => !Number.isInteger(n))) return null
@@ -80,8 +82,24 @@ export function parseScreenTruth(out: string): ScreenTruth | null {
 	return {
 		fullscreen: fs === 1,
 		bounds,
-		workArea: fs === 1 ? bounds : { x: visX, y: visY, width: visW, height: visH },
+		workArea: { x: visX, y: visY, width: visW, height: visH },
 	}
+}
+
+// True when the pill should anchor to the full screen bounds instead of the
+// usable area: only when the usable area reaches the screen bottom, i.e. the
+// Dock is hidden. The fullscreen flag deliberately plays no part — covering
+// windows trip it while the Dock stays visible, and hugging then would park
+// the pill behind the Dock.
+export function shouldHugBottom(truth: ScreenTruth): boolean {
+	return !isDockVisible(truth.workArea, truth.bounds)
+}
+
+// Stable key for the current placement inputs; the caller repositions the
+// pill only when it changes.
+export function placementKey(truth: ScreenTruth, hug: boolean): string {
+	const { bounds, workArea } = truth
+	return `${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}|${workArea.x}:${workArea.y}:${workArea.width}:${workArea.height}|${hug ? 1 : 0}`
 }
 
 export const PILL_HEIGHT = 44

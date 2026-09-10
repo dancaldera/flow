@@ -1,4 +1,5 @@
-import { ChildProcess, spawn, spawnSync } from 'node:child_process'
+import { ChildProcess, execFile, spawn } from 'node:child_process'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
 import { ERROR_VISIBLE_MS, IPC_CHANNELS, type FlowPhase, type FlowState } from './ipc'
@@ -12,7 +13,7 @@ import {
 	report,
 	requestMicrophone,
 } from './main/permissions'
-import { createPillWindow, isDockVisible, parseScreenTruth, placePillBottomCenter, resolvePaths, type ScreenTruth } from './main/pillWindow'
+import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
 import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, loadProviderToken, loadSettings, providerStatus, saveProviderSetup } from './main/settings'
 import { SttError, createSttProvider } from './services/stt'
 
@@ -101,59 +102,76 @@ function refreshTrayMenu(): void {
 
 
 function fullscreenCheckPath(): string {
-	// electron-builder unpacks binaries next to the asar; spawnSync cannot
+	// electron-builder unpacks binaries next to the asar; child processes cannot
 	// execute from inside the archive, so swap to app.asar.unpacked when packaged.
 	return path.join(app.getAppPath().replace('app.asar', 'app.asar.unpacked'), 'swift', 'flow-fullscreen-check')
 }
 
-// Placement ground truth from the sidecar: a fresh Cocoa process reads the
-// real display geometry, while THIS process caches metrics and goes stale
-// after Dock and fullscreen changes (bounds AND workArea). Falls back to
-// Electron's own data only when the binary is missing, so dev still works
-// before the sidecar is built.
-function activeDisplay(): ScreenTruth {
-	try {
-		const binary = fullscreenCheckPath()
-		if (require('node:fs').existsSync(binary)) {
-			const result = spawnSync(binary, [], { timeout: 1500, encoding: 'utf8' })
-			const truth = result.status === 0 ? parseScreenTruth(result.stdout) : null
-			if (truth) return truth
-		}
-	} catch {
-		// fall through to Electron's (possibly stale) view
-	}
+// Placement ground truth comes from the sidecar: a fresh Cocoa process reads
+// the real display geometry, while THIS process caches metrics and goes stale
+// after Dock and fullscreen changes (bounds AND workArea). The sidecar is
+// read asynchronously — spawning a Cocoa process takes ~100ms and must not
+// block the event loop — with the last good reading (or Electron's own data,
+// so dev still works before the sidecar is built) covering the gap.
+let cachedTruth: ScreenTruth | null = null
+let sidecarInFlight = false
+
+function electronTruth(): ScreenTruth {
 	const display = screen.getPrimaryDisplay()
 	return { fullscreen: false, bounds: display.bounds, workArea: display.workArea }
 }
 
-function pillPlan(): { truth: ScreenTruth; hug: boolean; key: string } {
-	const truth = activeDisplay()
-	const hug = !isDockVisible(truth.workArea, truth.bounds) || truth.fullscreen
-	const { bounds, workArea } = truth
-	const key = `${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}|${workArea.x}:${workArea.y}:${workArea.width}:${workArea.height}|${hug ? 1 : 0}`
-	return { truth, hug, key }
+function readSidecarTruth(): Promise<ScreenTruth | null> {
+	return new Promise((resolve) => {
+		try {
+			const binary = fullscreenCheckPath()
+			if (!fs.existsSync(binary)) return resolve(null)
+			execFile(binary, [], { timeout: 1500 }, (error, stdout) => {
+				if (error) return resolve(null)
+				resolve(parseScreenTruth(String(stdout ?? '')))
+			})
+		} catch {
+			resolve(null)
+		}
+	})
+}
+
+let lastPlacement = ''
+
+// Single placement flow for showing, polling, and display changes: refresh
+// the sidecar truth, then reposition only when the placement inputs changed.
+// At most one sidecar read is ever outstanding; concurrent ticks reuse its
+// result instead of queueing redundant spawns.
+async function updatePillPlacement(): Promise<void> {
+	if (!pill || pill.isDestroyed() || sidecarInFlight) return
+	sidecarInFlight = true
+	try {
+		cachedTruth = (await readSidecarTruth()) ?? cachedTruth ?? electronTruth()
+		if (!pill || pill.isDestroyed()) return
+		const hug = shouldHugBottom(cachedTruth)
+		const key = placementKey(cachedTruth, hug)
+		if (key !== lastPlacement) {
+			lastPlacement = key
+			console.log(`[flow] pill placed: hug=${hug}`)
+			placePillBottomCenter(pill, cachedTruth, { hugBottom: hug })
+		}
+	} finally {
+		sidecarInFlight = false
+	}
 }
 
 function showPill(): void {
 	if (!pill) return
-	const { truth, hug } = pillPlan()
-	placePillBottomCenter(pill, truth, { hugBottom: hug })
 	pill.showInactive()
+	void updatePillPlacement()
 }
-
-let lastPlacement = ''
 
 // macOS exposes no Dock-changed event, so poll: the sidecar re-reads real
 // geometry as the Dock shows, hides, or resizes and as fullscreen toggles,
 // and the pill follows it.
 function followDock(): void {
 	if (!pill || pill.isDestroyed()) return
-	const { truth, hug, key } = pillPlan()
-	if (key !== lastPlacement) {
-		lastPlacement = key
-		console.log(`[flow] pill placed: hug=${hug}`)
-		placePillBottomCenter(pill, truth, { hugBottom: hug })
-	}
+	void updatePillPlacement()
 }
 
 async function startListening(source: string): Promise<void> {
@@ -224,7 +242,7 @@ function spawnFnHelper(): void {
 	// The helper prints "down"/"up" lines. Absence is fine: the ⌥Space fallback covers v0.1.
 	const binary = fnHelperPath()
 	try {
-		if (!require('node:fs').existsSync(binary)) {
+		if (!fs.existsSync(binary)) {
 			fnHelper = null
 			console.log('[flow] fn hotkey: helper not built (swift/flow-fn-listener missing) — use ⌥Space. Build: swiftc -o swift/flow-fn-listener swift/fn-listener.swift -framework Cocoa')
 			return
@@ -303,6 +321,8 @@ async function startFlowIfReady(): Promise<void> {
 	flowStarted = true
 	const { preloadPath, indexPath } = resolvePaths(__dirname)
 	pill = createPillWindow(preloadPath, indexPath)
+	// Place before the first show so the pill never flashes at a stale spot.
+	await updatePillPlacement()
 	screen.on('display-metrics-changed', followDock)
 	setInterval(followDock, 1500)
 	registerFallbackShortcut()
