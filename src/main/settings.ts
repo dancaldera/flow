@@ -219,6 +219,12 @@ export interface ProviderSetup {
 	token: string
 }
 
+export interface ResolvedProviderSetup {
+	settings: FlowSettings
+	token: string
+	newToken: string
+}
+
 export interface ProviderStatus {
 	provider: SttProviderId
 	model: string
@@ -266,7 +272,7 @@ export function isProviderConfigured(settings = loadSettings()): boolean {
 	return Boolean(loadProviderToken(settings.provider)) && (settings.provider !== 'cloudflare' || Boolean(settings.accountId))
 }
 
-export function saveProviderSetup(setup: unknown): ProviderStatus {
+export function resolveProviderSetup(setup: unknown): ResolvedProviderSetup {
 	if (!setup || typeof setup !== 'object') throw new Error('Choose a provider and enter its API key.')
 	const candidate = setup as Partial<ProviderSetup>
 	if (!isProvider(candidate.provider ?? '')) {
@@ -275,7 +281,8 @@ export function saveProviderSetup(setup: unknown): ProviderStatus {
 	const provider = candidate.provider as SttProviderId
 	// An empty token keeps the already-saved key; only a non-empty one replaces it.
 	const token = typeof candidate.token === 'string' ? candidate.token.trim() : ''
-	if (!token && !loadProviderToken(provider)) {
+	const savedToken = loadProviderToken(provider)
+	if (!token && !savedToken) {
 		throw new Error('An API key is required — no key is saved for this provider yet.')
 	}
 	if (candidate.accountId !== undefined && typeof candidate.accountId !== 'string') throw new Error('Invalid Cloudflare account ID.')
@@ -293,8 +300,13 @@ export function saveProviderSetup(setup: unknown): ProviderStatus {
 		model,
 		language: resolveLanguage(provider, model, typeof candidate.language === 'string' ? candidate.language : undefined),
 	}
-	if (token) saveProviderToken(provider, token)
-	saveSettings(next)
+	return { settings: next, token: token || savedToken, newToken: token }
+}
+
+export function saveProviderSetup(setup: unknown): ProviderStatus {
+	const resolved = resolveProviderSetup(setup)
+	if (resolved.newToken) saveProviderToken(resolved.settings.provider, resolved.newToken)
+	saveSettings(resolved.settings)
 	return providerStatus()
 }
 
@@ -358,6 +370,12 @@ export interface LlmStatus {
 	configured: boolean
 }
 
+export interface ResolvedLlmSetup {
+	settings: FlowSettings
+	token: string
+	newToken: string
+}
+
 export function resolveLlmBaseUrl(baseUrl: string | undefined): string {
 	return baseUrl?.trim() || DEFAULT_LLM_BASE_URL
 }
@@ -378,7 +396,7 @@ export function isLlmConfigured(): boolean {
 	return Boolean(loadLlmToken())
 }
 
-export function saveLlmSetup(setup: unknown): LlmStatus {
+export function resolveLlmSetup(setup: unknown): ResolvedLlmSetup {
 	if (!setup || typeof setup !== 'object') throw new Error('Enter the LLM endpoint, model, and API key.')
 	const candidate = setup as Partial<LlmSetup>
 	const baseUrl = resolveLlmBaseUrl(typeof candidate.baseUrl === 'string' ? candidate.baseUrl : undefined)
@@ -391,13 +409,19 @@ export function saveLlmSetup(setup: unknown): LlmStatus {
 	const model = resolveLlmModel(typeof candidate.model === 'string' ? candidate.model : undefined)
 	// An empty token keeps the already-saved key; only a non-empty one replaces it.
 	const token = typeof candidate.token === 'string' ? candidate.token.trim() : ''
-	if (!token && !loadLlmToken()) {
+	const savedToken = loadLlmToken()
+	if (!token && !savedToken) {
 		throw new Error('An API key is required — no LLM key is saved yet.')
 	}
 	const next: FlowSettings = { ...loadSettings(), llmBaseUrl: baseUrl, llmModel: model }
-	if (token) saveLlmToken(token)
-	saveSettings(next)
-	return llmStatus(next)
+	return { settings: next, token: token || savedToken, newToken: token }
+}
+
+export function saveLlmSetup(setup: unknown): LlmStatus {
+	const resolved = resolveLlmSetup(setup)
+	if (resolved.newToken) saveLlmToken(resolved.newToken)
+	saveSettings(resolved.settings)
+	return llmStatus(resolved.settings)
 }
 
 function llmTokenPath(): string {

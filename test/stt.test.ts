@@ -45,6 +45,7 @@ import {
 	VercelGatewayStt,
 	buildGatewayTranscriptionsUrl,
 	getAudioFormatFromMimeType,
+	testSttProvider,
 } from '../src/services/stt'
 
 const audio = { audio: Buffer.alloc(4096), filename: 'flow.webm', mimeType: 'audio/webm' }
@@ -241,6 +242,16 @@ describe('other STT providers', () => {
 		expect(fetchMock.mock.calls).toHaveLength(3)
 		const submitted = JSON.parse(fetchMock.mock.calls[1]?.[1].body as string)
 		expect(submitted.speech_models).toEqual(['universal-3-5-pro', 'universal-2'])
+		vi.unstubAllGlobals()
+	})
+})
+
+describe('connection test', () => {
+	it('treats an empty transcript as a successful provider check', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ text: '' }), { status: 200 }))
+		vi.stubGlobal('fetch', fetchMock)
+		await expect(testSttProvider(new OpenAiCompatibleStt('OpenAI', 'https://example.test/transcribe', 'tok', 'whisper-1'))).resolves.toBeUndefined()
+		expect(fetchMock).toHaveBeenCalledOnce()
 		vi.unstubAllGlobals()
 	})
 })

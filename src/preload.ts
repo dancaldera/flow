@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('flowSetup', {
 	get: () => ipcRenderer.invoke('onboarding:get'),
 	save: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => ipcRenderer.invoke('onboarding:save-setup', setup),
 	saveLlm: (setup: { baseUrl: string; model: string; token: string }) => ipcRenderer.invoke('onboarding:save-llm', setup),
+	testStt: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => ipcRenderer.invoke('onboarding:test-stt', setup),
+	testLlm: (setup: { baseUrl: string; model: string; token: string }) => ipcRenderer.invoke('onboarding:test-llm', setup),
 	requestMic: () => ipcRenderer.invoke('permissions:request-mic'),
 	promptAccessibility: () => ipcRenderer.invoke('permissions:prompt-accessibility'),
 	openInputMonitoring: () => ipcRenderer.invoke('permissions:open-input-monitoring'),

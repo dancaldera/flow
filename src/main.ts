@@ -18,9 +18,9 @@ import {
 	requestMicrophone,
 } from './main/permissions'
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
-import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, saveLlmSetup, saveProviderSetup } from './main/settings'
+import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveLlmSetup, resolveProviderSetup, saveLlmSetup, saveProviderSetup } from './main/settings'
 import { createLlmClient } from './services/llm'
-import { SttError, createSttProvider } from './services/stt'
+import { SttError, createSttProvider, testSttProvider } from './services/stt'
 
 let pill: BrowserWindow | null = null
 let onboarding: BrowserWindow | null = null
@@ -653,6 +653,18 @@ export async function boot(): Promise<void> {
 	})
 	ipcMain.handle('onboarding:save-setup', (_event, setup) => saveProviderSetup(setup))
 	ipcMain.handle('onboarding:save-llm', (_event, setup) => saveLlmSetup(setup))
+	ipcMain.handle('onboarding:test-stt', async (_event, setup) => {
+		const resolved = resolveProviderSetup(setup)
+		await testSttProvider(createSttProvider(resolved.settings, resolved.token), resolved.settings.language || undefined)
+		return { provider: resolved.settings.provider, model: resolved.settings.model }
+	})
+	ipcMain.handle('onboarding:test-llm', async (_event, setup) => {
+		const resolved = resolveLlmSetup(setup)
+		const client = createLlmClient(resolved.settings, resolved.token)
+		if (!client) throw new Error('An LLM API key is required.')
+		await client.summarize('Reply with exactly: OK.')
+		return { model: resolved.settings.llmModel }
+	})
 	ipcMain.handle('permissions:request-mic', async () => {
 		const granted = await requestMicrophone()
 		console.log(`[flow] microphone request → ${granted ? 'granted' : 'denied'}`)

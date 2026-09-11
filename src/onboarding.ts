@@ -15,6 +15,8 @@ declare global {
 			get: () => Promise<OnboardingState>
 			save: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => Promise<Setup>
 			saveLlm: (setup: { baseUrl: string; model: string; token: string }) => Promise<LlmState>
+			testStt: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => Promise<{ provider: string; model: string }>
+			testLlm: (setup: { baseUrl: string; model: string; token: string }) => Promise<{ model: string }>
 			requestMic: () => Promise<boolean>
 			promptAccessibility: () => Promise<void>
 			openInputMonitoring: () => Promise<void>
@@ -38,10 +40,14 @@ const accountId = document.getElementById('account-id') as HTMLInputElement
 const gatewayId = document.getElementById('gateway-id') as HTMLInputElement
 const token = document.getElementById('token') as HTMLInputElement
 const keyStatus = document.getElementById('key-status') as HTMLDivElement
+const btnTestStt = document.getElementById('btn-test-stt') as HTMLButtonElement
+const sttTestStatus = document.getElementById('stt-test-status') as HTMLSpanElement
 const llmBaseUrl = document.getElementById('llm-base-url') as HTMLInputElement
 const llmModel = document.getElementById('llm-model') as HTMLInputElement
 const llmToken = document.getElementById('llm-token') as HTMLInputElement
 const llmStatus = document.getElementById('llm-status') as HTMLDivElement
+const btnTestLlm = document.getElementById('btn-test-llm') as HTMLButtonElement
+const llmTestStatus = document.getElementById('llm-test-status') as HTMLSpanElement
 const error = document.getElementById('error') as HTMLDivElement
 const dotMic = document.getElementById('dot-mic') as HTMLSpanElement
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement
@@ -223,6 +229,52 @@ function renderLlm(): void {
 	}
 }
 
+function testStatus(element: HTMLSpanElement, message: string, kind = ''): void {
+	element.textContent = message
+	element.className = `test-status ${kind}`.trim()
+}
+
+function clearSttTest(): void {
+	testStatus(sttTestStatus, '')
+}
+
+function clearLlmTest(): void {
+	testStatus(llmTestStatus, '')
+}
+
+async function testStt(): Promise<void> {
+	btnTestStt.disabled = true
+	testStatus(sttTestStatus, 'Testing…')
+	try {
+		const result = await window.flowSetup.testStt({
+			provider: providerId,
+			accountId: accountId.value,
+			gatewayId: gatewayId.value,
+			model: modelSelect.value,
+			language: langSelect.value,
+			token: token.value,
+		})
+		testStatus(sttTestStatus, `✓ ${result.model} accepted.`, 'ok')
+	} catch (cause) {
+		testStatus(sttTestStatus, cause instanceof Error ? cause.message : 'Could not test transcription.', 'fail')
+	} finally {
+		btnTestStt.disabled = false
+	}
+}
+
+async function testLlm(): Promise<void> {
+	btnTestLlm.disabled = true
+	testStatus(llmTestStatus, 'Testing…')
+	try {
+		const result = await window.flowSetup.testLlm({ baseUrl: llmBaseUrl.value, model: llmModel.value, token: llmToken.value })
+		testStatus(llmTestStatus, `✓ ${result.model} responded.`, 'ok')
+	} catch (cause) {
+		testStatus(llmTestStatus, cause instanceof Error ? cause.message : 'Could not test LLM.', 'fail')
+	} finally {
+		btnTestLlm.disabled = false
+	}
+}
+
 function showPermissions(): void {
 	setupStep.classList.add('hidden')
 	permissionsStep.classList.remove('hidden')
@@ -277,16 +329,29 @@ async function refresh(): Promise<void> {
 }
 
 providerSelect.onchange = () => {
+	clearSttTest()
 	const keepSaved = providerSelect.value === state?.setup.provider
 	selectProvider(providerSelect.value, keepSaved ? state?.setup.model : undefined, keepSaved ? state?.setup.language : undefined)
 }
 modelSearch.oninput = () => filterModels()
 modelSelect.onchange = () => {
+	clearSttTest()
 	renderModelHint()
 	buildLanguageOptions(langSelect.value || undefined)
 }
 langSearch.oninput = () => filterLanguages()
-langSelect.onchange = () => renderLanguageHint()
+langSelect.onchange = () => {
+	clearSttTest()
+	renderLanguageHint()
+}
+token.oninput = clearSttTest
+accountId.oninput = clearSttTest
+gatewayId.oninput = clearSttTest
+llmBaseUrl.oninput = clearLlmTest
+llmModel.oninput = clearLlmTest
+llmToken.oninput = clearLlmTest
+btnTestStt.onclick = () => void testStt()
+btnTestLlm.onclick = () => void testLlm()
 btnSave.onclick = () =>
 	void (async () => {
 		error.textContent = ''

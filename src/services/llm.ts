@@ -76,8 +76,8 @@ export class OpenAiCompatibleLlm implements LlmClient {
 }
 
 /** Null when no LLM key is configured — meeting summaries are optional. */
-export function createLlmClient(settings?: FlowSettings): LlmClient | null {
-	const token = loadLlmToken()
+export function createLlmClient(settings?: FlowSettings, tokenOverride?: string): LlmClient | null {
+	const token = tokenOverride ?? loadLlmToken()
 	if (!token) return null
 	return new OpenAiCompatibleLlm(
 		resolveLlmBaseUrl(settings?.llmBaseUrl),

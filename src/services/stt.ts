@@ -259,8 +259,38 @@ export class AssemblyAiStt implements SttProvider {
 	}
 }
 
-export function createSttProvider(settings: FlowSettings): SttProvider {
-	const token = loadProviderToken(settings.provider)
+function testAudio(): Buffer {
+	const sampleRate = 16000
+	const dataSize = sampleRate * 2
+	const wav = Buffer.alloc(44 + dataSize)
+	wav.write('RIFF', 0)
+	wav.writeUInt32LE(36 + dataSize, 4)
+	wav.write('WAVE', 8)
+	wav.write('fmt ', 12)
+	wav.writeUInt32LE(16, 16)
+	wav.writeUInt16LE(1, 20)
+	wav.writeUInt16LE(1, 22)
+	wav.writeUInt32LE(sampleRate, 24)
+	wav.writeUInt32LE(sampleRate * 2, 28)
+	wav.writeUInt16LE(2, 32)
+	wav.writeUInt16LE(16, 34)
+	wav.write('data', 36)
+	wav.writeUInt32LE(dataSize, 40)
+	return wav
+}
+
+/** Sends a one-second silent sample; an empty transcript still proves auth/model acceptance. */
+export async function testSttProvider(provider: SttProvider, language?: string): Promise<void> {
+	try {
+		await provider.transcribe({ audio: testAudio(), filename: 'flow-connection-test.wav', mimeType: 'audio/wav', language })
+	} catch (error) {
+		if (error instanceof SttError && error.kind === 'empty') return
+		throw error
+	}
+}
+
+export function createSttProvider(settings: FlowSettings, tokenOverride?: string): SttProvider {
+	const token = tokenOverride ?? loadProviderToken(settings.provider)
 	const model = resolveProviderModel(settings.provider, settings.model || undefined)
 	switch (settings.provider) {
 		case 'cloudflare':
