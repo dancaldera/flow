@@ -31,6 +31,14 @@ export interface HistoryPage {
 const DEFAULT_PAGE_SIZE = 50
 const MAX_PAGE_SIZE = 200
 
+const TRANSCRIPTIONS_SCHEMA = `CREATE TABLE IF NOT EXISTS transcriptions (
+		id INTEGER PRIMARY KEY,
+		text TEXT NOT NULL CHECK (length(text) > 0),
+		provider TEXT NOT NULL DEFAULT '',
+		source TEXT NOT NULL DEFAULT '' CHECK (source IN ('', 'fn', 'shortcut', 'mouse', 'meeting')),
+		created_at INTEGER NOT NULL
+	)`
+
 export function getHistoryDbPath(): string {
 	return path.join(app.getPath('userData'), 'flow-history.db')
 }
@@ -38,16 +46,23 @@ export function getHistoryDbPath(): string {
 export function openHistoryDb(filePath: string): DatabaseSync {
 	if (filePath !== ':memory:') fs.mkdirSync(path.dirname(filePath), { recursive: true })
 	const db = new DatabaseSync(filePath)
-	db.exec(`CREATE TABLE IF NOT EXISTS transcriptions (
-		id INTEGER PRIMARY KEY,
-		text TEXT NOT NULL CHECK (length(text) > 0),
-		provider TEXT NOT NULL DEFAULT '',
-		source TEXT NOT NULL DEFAULT '' CHECK (source IN ('', 'fn', 'shortcut', 'mouse')),
-		created_at INTEGER NOT NULL
-	)`)
+	db.exec(TRANSCRIPTIONS_SCHEMA)
+	migrateSourceCheck(db)
 	db.exec('CREATE INDEX IF NOT EXISTS idx_transcriptions_created ON transcriptions (created_at DESC, id DESC)')
 	db.exec('PRAGMA journal_mode = WAL')
 	return db
+}
+
+// SQLite cannot ALTER a CHECK constraint, so pre-meeting databases are
+// rebuilt: rename, recreate with the new schema, copy rows back (ids and
+// timestamps preserved), drop the legacy table.
+function migrateSourceCheck(db: DatabaseSync): void {
+	const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'transcriptions'`).get() as unknown as { sql: string } | undefined
+	if (!row?.sql || row.sql.includes(`'meeting'`)) return
+	db.exec('ALTER TABLE transcriptions RENAME TO transcriptions_legacy')
+	db.exec(TRANSCRIPTIONS_SCHEMA)
+	db.exec('INSERT INTO transcriptions (id, text, provider, source, created_at) SELECT id, text, provider, source, created_at FROM transcriptions_legacy')
+	db.exec('DROP TABLE transcriptions_legacy')
 }
 
 /** Records one transcription; returns the row id, or null for empty text. */

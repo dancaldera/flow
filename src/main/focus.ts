@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import * as path from 'node:path'
 
 export function focusHelperPath(): string {
@@ -29,15 +29,36 @@ function runHelper(args: string[]): string | null {
 export function frontmostApp(): AppRef | null {
 	const out = runHelper(['--print'])
 	if (!out) return null
-	const [pidText, bundleId] = out.split(' ', 2)
-	const pid = Number(pidText)
-	if (!Number.isInteger(pid) || pid <= 0 || !bundleId) return null
-	return { pid, bundleId }
+	return parseFrontmost(out)
 }
 
 /** Activates the app only if pid still has the captured bundle id. */
 export function activateApp(ref: AppRef): boolean {
 	return runHelper(['--activate', String(ref.pid), ref.bundleId]) !== null
+}
+
+function parseFrontmost(out: string): AppRef | null {
+	const [pidText, bundleId] = out.trim().split(' ', 2)
+	const pid = Number(pidText)
+	if (!Number.isInteger(pid) || pid <= 0 || !bundleId) return null
+	return { pid, bundleId }
+}
+
+/**
+ * The frontmost app without blocking the event loop: for background polling
+ * (meeting detection). Hover-time capture keeps the synchronous version.
+ */
+export function frontmostAppAsync(): Promise<AppRef | null> {
+	return new Promise((resolve) => {
+		try {
+			execFile(focusHelperPath(), ['--print'], { timeout: 1500, encoding: 'utf8' }, (error, stdout) => {
+				if (error) return resolve(null)
+				resolve(parseFrontmost(String(stdout ?? '')))
+			})
+		} catch {
+			resolve(null)
+		}
+	})
 }
 
 /**

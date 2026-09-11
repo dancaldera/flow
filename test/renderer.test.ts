@@ -8,21 +8,33 @@ type FlowState = { phase: string; message?: string; seconds?: number }
 // Calls the renderer makes toward main, in order.
 const calls: Array<{ method: string; arg?: unknown }> = []
 let stateCb: ((s: FlowState) => void) | null = null
+let suggestCb: ((suggest: boolean) => void) | null = null
+let activeCb: ((active: boolean) => void) | null = null
 
 async function loadRenderer(): Promise<void> {
 	// Fresh DOM per test; the renderer binds at import time.
 	document.body.innerHTML =
-		'<div id="pill"><span id="dot" class="dot idle"></span><div id="texts"><div id="hint"></div></div><span id="cta">Hold to talk</span><span id="cta-alt">Double-click to latch</span></div>'
+		'<div id="pill"><span id="dot" class="dot idle"></span><div id="texts"><div id="hint"></div></div><span id="cta">Hold to talk</span><span id="cta-alt">Double-click to latch</span><span id="meet">Transcribe meeting?</span></div>'
 	calls.length = 0
 	stateCb = null
+	suggestCb = null
+	activeCb = null
 	;(window as unknown as { flow: unknown }).flow = {
 		onState: (cb: (s: FlowState) => void) => {
 			stateCb = cb
 		},
 		onCommand: () => {},
+		onMeetingSuggest: (cb: (suggest: boolean) => void) => {
+			suggestCb = cb
+		},
+		onMeetingActive: (cb: (active: boolean) => void) => {
+			activeCb = cb
+		},
 		audioChunk: (...args: unknown[]) => calls.push({ method: 'audioChunk', arg: args }),
 		start: () => calls.push({ method: 'start' }),
 		stop: () => calls.push({ method: 'stop' }),
+		startMeeting: () => calls.push({ method: 'startMeeting' }),
+		stopMeeting: () => calls.push({ method: 'stopMeeting' }),
 		setHover: (hovering: boolean) => calls.push({ method: 'setHover', arg: hovering }),
 	}
 	vi.resetModules()
@@ -49,8 +61,20 @@ function leave(): void {
 	pill().dispatchEvent(new MouseEvent('mouseleave'))
 }
 
-function setPhase(phase: string, seconds?: number): void {
-	stateCb?.({ phase, seconds })
+function setPhase(phase: string, seconds?: number, message?: string): void {
+	stateCb?.({ phase, seconds, message })
+}
+
+function suggest(on: boolean): void {
+	suggestCb?.(on)
+}
+
+function setActive(on: boolean): void {
+	activeCb?.(on)
+}
+
+function meetDown(): void {
+	;(document.getElementById('meet') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
 }
 
 function hintText(): string {
@@ -196,5 +220,67 @@ describe('pill hover copy', () => {
 		expect(html).toContain('Double-click to latch')
 		expect(css).toContain('#cta-alt')
 		expect(css).toContain('user-select: none')
+	})
+})
+
+describe('meeting suggestion', () => {
+	it('shows the teaser while idle and hides it otherwise', () => {
+		expect(document.body.dataset.meeting).toBe('false')
+		suggest(true)
+		expect(document.body.dataset.meeting).toBe('true')
+		setPhase('listening')
+		expect(document.body.dataset.meeting).toBe('false')
+		setPhase('idle')
+		expect(document.body.dataset.meeting).toBe('true')
+		suggest(false)
+		expect(document.body.dataset.meeting).toBe('false')
+	})
+
+	it('starts a meeting from the teaser without starting a snippet', () => {
+		suggest(true)
+		meetDown()
+		expect(methods()).toContain('startMeeting')
+		expect(methods()).not.toContain('start')
+	})
+
+	it('ignores the teaser when not suggested or not idle', () => {
+		meetDown()
+		expect(methods()).not.toContain('startMeeting')
+		suggest(true)
+		setPhase('listening')
+		meetDown()
+		expect(methods()).not.toContain('startMeeting')
+	})
+
+	it('labels the meeting phase with the elapsed time and stop hint', () => {
+		setActive(true)
+		setPhase('listening', 0, 'Meeting…')
+		expect(hintText()).toBe('Meeting… · click to stop')
+		setPhase('listening', 5, 'Meeting…')
+		expect(hintText()).toBe('Meeting… 5s · click to stop')
+	})
+
+	it('stops the meeting on the next pill press', () => {
+		setActive(true)
+		setPhase('listening', 0, 'Meeting…')
+		down()
+		expect(methods()).toContain('stopMeeting')
+		expect(methods()).not.toContain('start')
+	})
+
+	it('keeps the pill interactive for the whole meeting', () => {
+		setActive(true)
+		expect(hoverArgs().at(-1)).toBe(true)
+		setActive(false)
+		expect(hoverArgs().at(-1)).toBe(false)
+	})
+
+	it('keeps the teaser in markup and styles', () => {
+		const root = process.cwd()
+		const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
+		const css = fs.readFileSync(path.join(root, 'styles', 'pill.css'), 'utf8')
+		expect(html).toContain('id="meet"')
+		expect(html).toContain('Transcribe meeting?')
+		expect(css).toContain('#meet')
 	})
 })

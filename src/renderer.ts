@@ -4,9 +4,13 @@ declare global {
 		flow: {
 			onState: (cb: (s: { phase: string; message?: string; seconds?: number }) => void) => void
 			onCommand: (cmd: 'start' | 'stop' | 'cancel', cb: () => void) => void
+			onMeetingSuggest: (cb: (suggest: boolean) => void) => void
+			onMeetingActive: (cb: (active: boolean) => void) => void
 			audioChunk: (base64: string, mime: string, done: boolean) => void
 			start: () => void
 			stop: () => void
+			startMeeting: () => void
+			stopMeeting: () => void
 			setHover: (hovering: boolean) => void
 		}
 	}
@@ -26,7 +30,8 @@ function setUI(phase: string, message?: string, seconds?: number): void {
 	document.body.dataset.phase = phase
 	if (phase === 'listening') {
 		dot.className = 'dot live'
-		hint.textContent = seconds ? `Listening… ${seconds}s` : 'Listening…'
+		const base = message ?? 'Listening…'
+		hint.textContent = seconds ? `${base} ${seconds}s` : base
 	} else if (phase === 'working') {
 		dot.className = 'dot busy'
 		hint.textContent = message ?? 'Transcribing…'
@@ -85,6 +90,8 @@ let phase = 'idle'
 let hovering = false
 let mouseDown = false
 let mouseRecording = false
+let meetingSuggest = false
+let meetingActive = false
 let lastHoverSent: boolean | null = null
 
 // A press shorter than this is a tap (double-click candidate); a longer
@@ -109,12 +116,13 @@ function clearLocalRecording(): void {
 	}
 }
 
-// Interactive while the cursor is over the idle pill (expanded) or while a
-// mouse-initiated recording is in flight (so the release always lands).
-// Hover visuals are additionally scoped to idle in CSS, so recording via fn
-// keeps its own UI even with the cursor parked over the pill.
+// Interactive while the cursor is over the idle pill (expanded), while a
+// mouse-initiated recording is in flight (so the release always lands), or
+// for the whole meeting (so the stop press always lands). Hover visuals are
+// additionally scoped to idle in CSS, so recording via fn keeps its own UI
+// even with the cursor parked over the pill.
 function updateHover(): void {
-	const active = mouseDown || mouseRecording || (hovering && phase === 'idle')
+	const active = meetingActive || mouseDown || mouseRecording || (hovering && phase === 'idle')
 	document.body.dataset.hover = active ? 'true' : 'false'
 	if (active !== lastHoverSent) {
 		lastHoverSent = active
@@ -122,7 +130,21 @@ function updateHover(): void {
 	}
 }
 
+// The meeting teaser shows on the idle pill only; anywhere else the meeting
+// flag is stale UI waiting for the next idle.
+function applyMeeting(): void {
+	document.body.dataset.meeting = meetingSuggest && phase === 'idle' ? 'true' : 'false'
+}
+
 const pill = document.getElementById('pill') as HTMLDivElement
+const meet = document.getElementById('meet') as HTMLSpanElement
+// The teaser starts a meeting instead of a snippet: stop propagation so the
+// pill's hold-to-talk press below never fires for the same click.
+meet.addEventListener('mousedown', (event) => {
+	event.stopPropagation()
+	if (!meetingSuggest || phase !== 'idle' || mouseDown || mouseRecording) return
+	window.flow.startMeeting()
+})
 pill.addEventListener('mouseenter', () => {
 	hovering = true
 	updateHover()
@@ -137,6 +159,11 @@ pill.addEventListener('mouseleave', () => {
 // pill cannot stick interactive. Two quick taps latch instead: recording
 // continues hands-free until the next press.
 pill.addEventListener('mousedown', () => {
+	if (meetingActive) {
+		// The whole pill is the stop button during a meeting.
+		window.flow.stopMeeting()
+		return
+	}
 	if (latched) {
 		// Single press stops a latched recording.
 		latched = false
@@ -200,11 +227,21 @@ window.flow.onState((s) => {
 	phase = s.phase
 	if (s.phase !== 'listening') clearLocalRecording()
 	setUI(s.phase, s.message, s.seconds)
-	if (s.phase === 'listening' && latched) hint.textContent += ' · click to stop'
+	if (s.phase === 'listening' && (latched || meetingActive)) hint.textContent += ' · click to stop'
+	applyMeeting()
 	updateHover()
 })
 window.flow.onCommand('start', () => void startCapture())
 window.flow.onCommand('stop', () => void stopCapture(true))
 window.flow.onCommand('cancel', () => void stopCapture(false))
+window.flow.onMeetingSuggest((suggest) => {
+	meetingSuggest = suggest
+	applyMeeting()
+})
+window.flow.onMeetingActive((active) => {
+	meetingActive = active
+	updateHover()
+})
 setUI('idle')
+applyMeeting()
 updateHover()

@@ -19,4 +19,10 @@ body[data-phase="idle"][data-hover="true"] #cta { max-width: 140px; opacity: 0.9
 #cta-alt { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; font-size: 11px; transition: max-width 0.2s ease-out, opacity 0.18s ease-out; }
 #cta-alt::before { content: "·"; margin: 0 6px 0 2px; }
 body[data-phase="idle"][data-hover="true"] #cta-alt { max-width: 170px; opacity: 0.55; }
-@media (prefers-reduced-motion: reduce) { #pill, #cta, #cta-alt, .dot { transition: none; animation: none; } }
+#meet { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; font-size: 11px; transition: max-width 0.2s ease-out, opacity 0.18s ease-out; }
+body[data-phase="idle"][data-meeting="true"] #pill { background: rgba(48, 48, 54, 0.92); border-color: rgba(48, 209, 88, 0.35); }
+body[data-phase="idle"][data-meeting="true"] .dot { display: block; background: #30d158; }
+body[data-phase="idle"][data-meeting="true"] #meet { max-width: 160px; opacity: 0.9; }
+body[data-phase="idle"][data-meeting="true"][data-hover="true"] #meet { max-width: 260px; }
+body[data-phase="idle"][data-meeting="true"][data-hover="true"] #meet::after { content: "· click to start"; opacity: 0.55; margin-left: 6px; }
+@media (prefers-reduced-motion: reduce) { #pill, #cta, #cta-alt, #meet, .dot { transition: none; animation: none; } }

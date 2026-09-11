@@ -4,7 +4,8 @@ type PermissionState = 'granted' | 'missing' | 'unknown'
 type ProviderModel = { id: string; label: string; blurb: string; languages: string[] }
 type Provider = { id: string; label: string; defaultModel: string; models: ProviderModel[]; needsAccountId: boolean; needsGatewayId: boolean }
 type Setup = { provider: string; model: string; language: string; configured: boolean }
-type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[] }
+type LlmState = { baseUrl: string; model: string; configured: boolean }
+type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState }
 
 const DEFAULT_AX_HINT = 'Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.'
 
@@ -13,6 +14,7 @@ declare global {
 		flowSetup: {
 			get: () => Promise<OnboardingState>
 			save: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => Promise<Setup>
+			saveLlm: (setup: { baseUrl: string; model: string; token: string }) => Promise<LlmState>
 			requestMic: () => Promise<boolean>
 			promptAccessibility: () => Promise<void>
 			openInputMonitoring: () => Promise<void>
@@ -36,6 +38,10 @@ const accountId = document.getElementById('account-id') as HTMLInputElement
 const gatewayId = document.getElementById('gateway-id') as HTMLInputElement
 const token = document.getElementById('token') as HTMLInputElement
 const keyStatus = document.getElementById('key-status') as HTMLDivElement
+const llmBaseUrl = document.getElementById('llm-base-url') as HTMLInputElement
+const llmModel = document.getElementById('llm-model') as HTMLInputElement
+const llmToken = document.getElementById('llm-token') as HTMLInputElement
+const llmStatus = document.getElementById('llm-status') as HTMLDivElement
 const error = document.getElementById('error') as HTMLDivElement
 const dotMic = document.getElementById('dot-mic') as HTMLSpanElement
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement
@@ -53,6 +59,7 @@ let state: OnboardingState | null = null
 let providerId = ''
 let modelsFor = ''
 let langsFor = ''
+let llmInit = false
 
 function selectedProvider(): Provider | undefined {
 	return state?.providers.find((provider) => provider.id === providerId)
@@ -197,6 +204,25 @@ function renderProvider(): void {
 	cloudflareFields.classList.toggle('hidden', !provider.needsAccountId)
 }
 
+function renderLlm(): void {
+	if (!state) return
+	// Fill the endpoint/model once: refresh() re-runs every 1.5s and must not
+	// clobber what the user is typing. The key field stays write-only.
+	if (!llmInit) {
+		llmInit = true
+		llmBaseUrl.value = state.llm.baseUrl
+		llmModel.value = state.llm.model
+	}
+	llmStatus.classList.toggle('saved', state.llm.configured)
+	if (state.llm.configured) {
+		llmStatus.textContent = `✓ LLM key saved (${state.llm.model}). Leave empty to keep it — a new key replaces it.`
+		llmToken.placeholder = 'Saved •••••• — enter a new key to replace'
+	} else {
+		llmStatus.textContent = 'Optional: no LLM key saved, meetings keep transcripts without summaries.'
+		llmToken.placeholder = ''
+	}
+}
+
 function showPermissions(): void {
 	setupStep.classList.add('hidden')
 	permissionsStep.classList.remove('hidden')
@@ -237,6 +263,7 @@ async function refresh(): Promise<void> {
 	} else {
 		renderProvider()
 	}
+	renderLlm()
 	dotMic.className = `dot ${state.permissions.microphone}`
 	dotAx.className = `dot ${state.permissions.accessibility}`
 	dotIm.className = `dot ${state.permissions.inputMonitoring ?? 'unknown'}`
@@ -267,6 +294,12 @@ btnSave.onclick = () =>
 		try {
 			await window.flowSetup.save({ provider: providerId, accountId: accountId.value, gatewayId: gatewayId.value, model: modelSelect.value, language: langSelect.value, token: token.value })
 			token.value = ''
+			// The LLM section is optional: untouched means skip, a new key or
+			// an already-saved one means persist (empty key keeps the saved key).
+			if (llmToken.value.trim() !== '' || state?.llm.configured) {
+				await window.flowSetup.saveLlm({ baseUrl: llmBaseUrl.value, model: llmModel.value, token: llmToken.value })
+				llmToken.value = ''
+			}
 			await refresh()
 			showPermissions()
 		} catch (cause) {

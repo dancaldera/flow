@@ -13,6 +13,10 @@ Wispr Flow-style UX, minimal scope: no streaming, no AI rewrite, no accounts.
 
 STT providers implement one seam (`src/services/stt.ts:SttProvider`), so adding Deepgram/OpenAI-local is a new class, not a rewrite.
 
+### Meeting mode
+
+When a video-call app (Zoom, Teams, Webex, FaceTime, Slack) is frontmost, the pill offers **Transcribe meeting?**. Click to record the call from your mic (your side of the conversation only — remote participants are not captured), click again to stop; minute-long segments transcribe in the background and the full transcript lands in History. With an optional LLM key in Setup (any OpenAI-compatible endpoint), Flow also saves a summary — key points, decisions, action items — in the transcript's language.
+
 ## Setup
 
 ```bash
@@ -30,7 +34,7 @@ On first run, Flow opens a two-step setup window:
 
 The pill, shortcuts, and fn helper start only after both setup steps are complete. Reopen the flow anytime from tray menu → **Setup & permissions…**. Usage instructions live in the app under tray menu → **How to use Flow…** — the floating pill follows the Dock (just above it when visible, hugging the bottom edge when hidden or fullscreen), rests as a subtle empty gray pill when idle, and fills with status while listening / transcribing / reporting an error.
 
-Credentials are stored separately from `settings.json` using Electron `safeStorage` (macOS Keychain); they are never exposed to the renderer. For development, these environment variables are also recognized: `CLOUDFLARE_AI_GATEWAY_TOKEN` (or `CLOUDFLARE_API_TOKEN`), `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `AI_GATEWAY_API_KEY`, `DEEPGRAM_API_KEY`, and `ASSEMBLYAI_API_KEY`.
+Credentials are stored separately from `settings.json` using Electron `safeStorage` (macOS Keychain); they are never exposed to the renderer. For development, these environment variables are also recognized: `CLOUDFLARE_AI_GATEWAY_TOKEN` (or `CLOUDFLARE_API_TOKEN`), `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `AI_GATEWAY_API_KEY`, `DEEPGRAM_API_KEY`, `ASSEMBLYAI_API_KEY`, and `LLM_API_KEY` (meeting summaries).
 
 | Provider | Selectable models (* = default) | Additional setup |
 | --- | --- | --- |

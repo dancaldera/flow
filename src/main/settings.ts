@@ -193,7 +193,12 @@ export interface FlowSettings {
 	model: string
 	language: string
 	maxSeconds: number
+	llmBaseUrl: string
+	llmModel: string
 }
+
+export const DEFAULT_LLM_BASE_URL = 'https://api.openai.com/v1'
+export const DEFAULT_LLM_MODEL = 'gpt-4o-mini'
 
 const DEFAULTS: FlowSettings = {
 	provider: 'cloudflare',
@@ -202,6 +207,8 @@ const DEFAULTS: FlowSettings = {
 	model: PROVIDERS.cloudflare.defaultModel,
 	language: '',
 	maxSeconds: 60,
+	llmBaseUrl: DEFAULT_LLM_BASE_URL,
+	llmModel: DEFAULT_LLM_MODEL,
 }
 export interface ProviderSetup {
 	provider: SttProviderId
@@ -235,7 +242,9 @@ export function loadSettings(): FlowSettings {
 				: detectedEnvironmentProvider()
 		const model = hasProvider ? resolveProviderModel(provider, saved.model) : PROVIDERS[provider].defaultModel
 		const language = hasProvider ? resolveLanguage(provider, model, saved.language) : ''
-		return { ...DEFAULTS, ...saved, provider, model, language }
+		const llmBaseUrl = saved.llmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL
+		const llmModel = saved.llmModel?.trim() || DEFAULT_LLM_MODEL
+		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel }
 	} catch {
 		const provider = detectedEnvironmentProvider()
 		return { ...DEFAULTS, provider, model: PROVIDERS[provider].defaultModel }
@@ -334,6 +343,84 @@ export function saveProviderToken(provider: SttProviderId, token: string): void 
 		fs.writeFileSync(tokenPath(provider), safeStorage.encryptString(token))
 	} else {
 		fs.writeFileSync(tokenPath(provider), Buffer.from(`plain:${token}`))
+	}
+}
+
+export interface LlmSetup {
+	baseUrl?: string
+	model?: string
+	token: string
+}
+
+export interface LlmStatus {
+	baseUrl: string
+	model: string
+	configured: boolean
+}
+
+export function resolveLlmBaseUrl(baseUrl: string | undefined): string {
+	return baseUrl?.trim() || DEFAULT_LLM_BASE_URL
+}
+
+export function resolveLlmModel(model: string | undefined): string {
+	return model?.trim() || DEFAULT_LLM_MODEL
+}
+
+export function llmStatus(settings = loadSettings()): LlmStatus {
+	return {
+		baseUrl: resolveLlmBaseUrl(settings.llmBaseUrl),
+		model: resolveLlmModel(settings.llmModel),
+		configured: isLlmConfigured(),
+	}
+}
+
+export function isLlmConfigured(): boolean {
+	return Boolean(loadLlmToken())
+}
+
+export function saveLlmSetup(setup: unknown): LlmStatus {
+	if (!setup || typeof setup !== 'object') throw new Error('Enter the LLM endpoint, model, and API key.')
+	const candidate = setup as Partial<LlmSetup>
+	const baseUrl = resolveLlmBaseUrl(typeof candidate.baseUrl === 'string' ? candidate.baseUrl : undefined)
+	try {
+		const url = new URL(baseUrl)
+		if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('bad protocol')
+	} catch {
+		throw new Error('LLM endpoint must be an http(s) URL.')
+	}
+	const model = resolveLlmModel(typeof candidate.model === 'string' ? candidate.model : undefined)
+	// An empty token keeps the already-saved key; only a non-empty one replaces it.
+	const token = typeof candidate.token === 'string' ? candidate.token.trim() : ''
+	if (!token && !loadLlmToken()) {
+		throw new Error('An API key is required — no LLM key is saved yet.')
+	}
+	const next: FlowSettings = { ...loadSettings(), llmBaseUrl: baseUrl, llmModel: model }
+	if (token) saveLlmToken(token)
+	saveSettings(next)
+	return llmStatus(next)
+}
+
+function llmTokenPath(): string {
+	return path.join(app.getPath('userData'), 'llm-token.bin')
+}
+
+export function saveLlmToken(token: string): void {
+	fs.mkdirSync(path.dirname(llmTokenPath()), { recursive: true })
+	if (safeStorage.isEncryptionAvailable()) {
+		fs.writeFileSync(llmTokenPath(), safeStorage.encryptString(token))
+	} else {
+		fs.writeFileSync(llmTokenPath(), Buffer.from(`plain:${token}`))
+	}
+}
+
+export function loadLlmToken(): string {
+	try {
+		const buf = fs.readFileSync(llmTokenPath())
+		if (safeStorage.isEncryptionAvailable()) return safeStorage.decryptString(buf)
+		const s = buf.toString('utf8')
+		return s.startsWith('plain:') ? s.slice(6) : ''
+	} catch {
+		return process.env.LLM_API_KEY ?? ''
 	}
 }
 

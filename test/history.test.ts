@@ -1,3 +1,7 @@
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
@@ -111,5 +115,30 @@ describe('history store', () => {
 
 	it('lives next to the other app data', () => {
 		expect(getHistoryDbPath()).toBe('/tmp/flow-history-test/userData/flow-history.db')
+	})
+
+	it('migrates pre-meeting databases to allow the meeting source', () => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow-history-migrate-'))
+		const file = path.join(dir, 'flow-history.db')
+		const legacy = new DatabaseSync(file)
+		legacy.exec(`CREATE TABLE transcriptions (
+			id INTEGER PRIMARY KEY,
+			text TEXT NOT NULL CHECK (length(text) > 0),
+			provider TEXT NOT NULL DEFAULT '',
+			source TEXT NOT NULL DEFAULT '' CHECK (source IN ('', 'fn', 'shortcut', 'mouse')),
+			created_at INTEGER NOT NULL
+		)`)
+		legacy.exec(`INSERT INTO transcriptions (text, provider, source, created_at) VALUES ('old', 'p', 'fn', 1)`)
+		legacy.close()
+		const db = openHistoryDb(file)
+		const id = recordTranscription(db, { text: 'm', provider: 'p', source: 'meeting' })
+		expect(id).toBeGreaterThan(1)
+		expect(listTranscriptions(db).rows.map((r) => r.text)).toEqual(['m', 'old'])
+		db.close()
+		// Reopening a migrated database is a no-op, not an error.
+		const reopened = openHistoryDb(file)
+		expect(listTranscriptions(reopened).total).toBe(2)
+		reopened.close()
+		fs.rmSync(dir, { recursive: true, force: true })
 	})
 })

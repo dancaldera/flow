@@ -4,7 +4,7 @@ vi.mock('electron', () => ({
 	app: { getAppPath: () => '/tmp/flow-focus-test' },
 }))
 
-import { type AppRef, resolvePasteTarget } from '../src/main/focus'
+import { type AppRef, frontmostAppAsync, resolvePasteTarget } from '../src/main/focus'
 
 const OWN = 1000
 const TARGET: AppRef = { pid: 2000, bundleId: 'dev.warp.Warp-Stable' }
@@ -27,5 +27,11 @@ describe('resolvePasteTarget', () => {
 		expect(resolvePasteTarget(SELF, OWN, SELF, true)).toBeNull()
 		expect(resolvePasteTarget(SELF, OWN, null, true)).toBeNull()
 		expect(resolvePasteTarget(null, OWN, TARGET, true)).toBeNull()
+	})
+})
+
+describe('frontmostAppAsync', () => {
+	it('resolves null when the helper binary is missing', async () => {
+		await expect(frontmostAppAsync()).resolves.toBeNull()
 	})
 })

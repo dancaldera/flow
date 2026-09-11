@@ -2,11 +2,12 @@ import { ChildProcess, execFile, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { BrowserWindow, Menu, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
+import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
 import { ERROR_VISIBLE_MS, IPC_CHANNELS, type FlowPhase, type FlowState } from './ipc'
-import { activateApp, frontmostApp, resolvePasteTarget, type AppRef } from './main/focus'
+import { activateApp, frontmostApp, frontmostAppAsync, resolvePasteTarget, type AppRef } from './main/focus'
 import { type HistoryListOptions, clearHistory, getHistoryDbPath, listTranscriptions, openHistoryDb, recordTranscription } from './main/history'
 import { insertTextAtCursor } from './main/inserter'
+import { formatTimestamp, isMeetingApp } from './main/meetings'
 import { checkForUpdates } from './main/updates'
 import {
 	allGranted,
@@ -17,7 +18,8 @@ import {
 	requestMicrophone,
 } from './main/permissions'
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
-import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, loadProviderToken, loadSettings, providerStatus, saveProviderSetup } from './main/settings'
+import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, saveLlmSetup, saveProviderSetup } from './main/settings'
+import { createLlmClient } from './services/llm'
 import { SttError, createSttProvider } from './services/stt'
 
 let pill: BrowserWindow | null = null
@@ -67,7 +69,7 @@ function setState(state: FlowState): void {
 function buildTrayMenu(): Menu {
 	const items: Electron.MenuItemConstructorOptions[] = [
 		{ label: 'Hold fn, speak, release', enabled: false },
-		{ label: 'Start / stop (⌥Space)', click: () => (recording ? void stopListening('toggle') : void startListening('shortcut')) },
+		{ label: 'Start / stop (⌥Space)', click: () => (meetingRecording ? void stopMeeting('ui') : recording ? void stopListening('toggle') : void startListening('shortcut')) },
 		{ type: 'separator' },
 	]
 	if (lastError) {
@@ -245,7 +247,7 @@ function followDock(): void {
 }
 
 async function startListening(source: string): Promise<void> {
-	if (recording || updating || !pill) return
+	if (recording || meetingRecording || updating || !pill) return
 	console.log(`[flow] start listening (source=${source})`)
 	recording = true
 	mouseInitiated = source === 'mouse'
@@ -306,6 +308,12 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 }
 
 function cancelListening(): void {
+	// Esc during a meeting stops and SAVES: meeting audio is irreplaceable,
+	// while a snippet can simply be re-dictated.
+	if (meetingRecording) {
+		void stopMeeting('ui')
+		return
+	}
 	if (!recording) return
 	recording = false
 	mouseInitiated = false
@@ -313,6 +321,166 @@ function cancelListening(): void {
 	if (stopTimer) clearTimeout(stopTimer)
 	if (secondsTimer) clearInterval(secondsTimer)
 	pill?.webContents.send(IPC_CHANNELS.FLOW_CANCEL)
+	setState({ phase: 'idle' })
+	showPill()
+}
+
+// Meeting mode: continuous mic capture while a video call is frontmost,
+// transcribed in minute segments, summarized at the end when an LLM key is
+// configured. Recording is always explicit — the pill only ever suggests.
+const MEETING_POLL_MS = 5000
+const MEETING_SEGMENT_MS = 60000
+const MEETING_MAX_MS = 3 * 3600 * 1000
+
+let meetingRecording = false
+let meetingSuggest = false
+let meetingPollInFlight = false
+let meetingChunks: Buffer[] = []
+let meetingSegments: string[] = []
+let meetingChain: Promise<void> = Promise.resolve()
+let meetingSeconds = 0
+let meetingSegmentStart = 0
+let meetingStopTimer: NodeJS.Timeout | null = null
+let meetingSecondsTimer: NodeJS.Timeout | null = null
+let meetingSegmentTimer: NodeJS.Timeout | null = null
+
+function notify(title: string, body: string): void {
+	try {
+		new Notification({ title: `Flow — ${title}`, body }).show()
+	} catch {
+		// notifications are best-effort
+	}
+}
+
+async function pollMeetingSuggest(): Promise<void> {
+	if (!pill || pill.isDestroyed() || meetingPollInFlight) return
+	if (recording || meetingRecording || updating) return
+	meetingPollInFlight = true
+	try {
+		const front = await frontmostAppAsync()
+		const suggest = !!front && isMeetingApp(front.bundleId)
+		if (suggest !== meetingSuggest) {
+			meetingSuggest = suggest
+			console.log(`[flow] meeting suggest: ${suggest ? `on (${front?.bundleId})` : 'off'}`)
+			pill?.webContents.send(IPC_CHANNELS.MEETING_SUGGEST, suggest)
+		}
+	} finally {
+		meetingPollInFlight = false
+	}
+}
+
+async function startMeeting(): Promise<void> {
+	if (meetingRecording || recording || updating || !pill) return
+	if (!isProviderConfigured()) {
+		setState({ phase: 'error', message: 'Configure transcription first (Setup & permissions…)' })
+		return
+	}
+	console.log('[flow] meeting start')
+	meetingRecording = true
+	meetingChunks = []
+	meetingSegments = []
+	meetingChain = Promise.resolve()
+	meetingSeconds = 0
+	meetingSegmentStart = 0
+	lastStartSource = 'meeting'
+	showPill()
+	pill.webContents.send(IPC_CHANNELS.MEETING_ACTIVE, true)
+	setState({ phase: 'listening', seconds: 0, message: 'Meeting…' })
+	pill.webContents.send(IPC_CHANNELS.FLOW_START)
+	if (meetingStopTimer) clearTimeout(meetingStopTimer)
+	meetingStopTimer = setTimeout(() => void stopMeeting('timeout'), MEETING_MAX_MS)
+	if (meetingSecondsTimer) clearInterval(meetingSecondsTimer)
+	meetingSecondsTimer = setInterval(() => {
+		meetingSeconds += 1
+		setState({ phase: 'listening', seconds: meetingSeconds, message: 'Meeting…' })
+	}, 1000)
+	if (meetingSegmentTimer) clearInterval(meetingSegmentTimer)
+	meetingSegmentTimer = setInterval(() => flushMeetingSegment(), MEETING_SEGMENT_MS)
+}
+
+// Slices the buffered audio into a segment and transcribes it. Segments run
+// strictly in order so the transcript never scrambles.
+function flushMeetingSegment(): void {
+	if (!meetingChunks.length) {
+		meetingSegmentStart = meetingSeconds
+		return
+	}
+	const audio = Buffer.concat(meetingChunks)
+	meetingChunks = []
+	const fromSecond = meetingSegmentStart
+	const toSecond = meetingSeconds
+	meetingSegmentStart = toSecond
+	meetingChain = meetingChain.then(() => transcribeMeetingSegment(audio, fromSecond, toSecond)).catch(() => {})
+}
+
+async function transcribeMeetingSegment(audio: Buffer, fromSecond: number, toSecond: number): Promise<void> {
+	try {
+		if (audio.length < 2000) return
+		const settings = loadSettings()
+		const provider = createSttProvider(settings)
+		const ext = audioMime.includes('wav') ? 'wav' : 'webm'
+		const text = await provider.transcribe({ audio, filename: `flow-meeting.${ext}`, mimeType: audioMime, language: settings.language || undefined })
+		meetingSegments.push(text)
+	} catch (error) {
+		if (error instanceof SttError && error.kind === 'empty') return
+		console.log(`[flow] meeting segment failed: ${error instanceof Error ? error.message : error}`)
+		meetingSegments.push(`[gap ${formatTimestamp(fromSecond)}–${formatTimestamp(toSecond)}]`)
+	}
+}
+
+async function stopMeeting(reason: 'ui' | 'timeout'): Promise<void> {
+	if (!meetingRecording || !pill) return
+	console.log(`[flow] meeting stop (reason=${reason}, seconds=${meetingSeconds})`)
+	meetingRecording = false
+	if (meetingStopTimer) clearTimeout(meetingStopTimer)
+	if (meetingSecondsTimer) clearInterval(meetingSecondsTimer)
+	if (meetingSegmentTimer) clearInterval(meetingSegmentTimer)
+	pill.webContents.send(IPC_CHANNELS.MEETING_ACTIVE, false)
+	setState({ phase: 'working', message: 'Finishing meeting…' })
+	pill.webContents.send(IPC_CHANNELS.FLOW_STOP)
+
+	// Wait briefly for the renderer's final audio chunk, then drain the queue.
+	await new Promise((r) => setTimeout(r, 400))
+	flushMeetingSegment()
+	await meetingChain
+	meetingChunks = []
+	const transcript = meetingSegments.join('\n').trim()
+	meetingSegments = []
+	if (!transcript) {
+		setState({ phase: 'idle' })
+		showPill()
+		return
+	}
+	const settings = loadSettings()
+	if (historyDb) {
+		try {
+			recordTranscription(historyDb, { text: transcript, provider: settings.provider, source: 'meeting' })
+		} catch (error) {
+			console.log(`[flow] meeting history failed: ${error instanceof Error ? error.message : error}`)
+		}
+	}
+	const llm = createLlmClient(settings)
+	if (!llm) {
+		notify('Meeting transcribed', 'Transcript saved to History. Add an LLM key in Setup for summaries.')
+		setState({ phase: 'idle' })
+		showPill()
+		return
+	}
+	setState({ phase: 'working', message: 'Summarizing…' })
+	try {
+		const summary = await llm.summarize(transcript)
+		if (historyDb) {
+			try {
+				recordTranscription(historyDb, { text: `Summary: ${summary}`, provider: 'llm', source: 'meeting' })
+			} catch (error) {
+				console.log(`[flow] summary history failed: ${error instanceof Error ? error.message : error}`)
+			}
+		}
+		notify('Meeting summarized', 'Transcript and summary saved to History.')
+	} catch (error) {
+		console.log(`[flow] summarize failed: ${error instanceof Error ? error.message : error}`)
+		notify('Meeting transcribed', 'Summary failed — transcript saved to History.')
+	}
 	setState({ phase: 'idle' })
 	showPill()
 }
@@ -365,7 +533,7 @@ function showHowToUse(): void {
 		type: 'info',
 		title: 'How to use Flow',
 		message: 'Hold fn, speak, release — text lands at your cursor.',
-		detail: '⌥Space starts/stops as a fallback.\nEsc cancels while listening.\nListening stops automatically at the time limit.\nHover the pill to expand it — hold to talk, or double-click to keep recording until you click again.\nChange provider, model, or language anytime via Setup & permissions…',
+		detail: '⌥Space starts/stops as a fallback.\nEsc cancels while listening.\nListening stops automatically at the time limit.\nHover the pill to expand it — hold to talk, or double-click to keep recording until you click again.\nIn a video call the pill offers Transcribe meeting — click to record, click again to stop; the transcript and summary land in History.\nChange provider, model, or language anytime via Setup & permissions…',
 		buttons: ['Got it'],
 	})
 }
@@ -377,7 +545,7 @@ function showOnboarding(): void {
 	}
 	onboarding = new BrowserWindow({
 		width: 460,
-		height: 700,
+		height: 800,
 		resizable: false,
 		alwaysOnTop: true,
 		webPreferences: {
@@ -407,6 +575,8 @@ async function startFlowIfReady(): Promise<void> {
 	await updatePillPlacement()
 	screen.on('display-metrics-changed', followDock)
 	setInterval(followDock, 1500)
+	setInterval(pollMeetingSuggest, MEETING_POLL_MS)
+	void pollMeetingSuggest()
 	registerFallbackShortcut()
 	spawnFnHelper()
 	setState({ phase: 'idle' })
@@ -445,12 +615,19 @@ export async function boot(): Promise<void> {
 	tray.setContextMenu(buildTrayMenu())
 
 	ipcMain.on('flow:audio', (_e, payload: { base64: string; mime: string; done: boolean }) => {
+		if (meetingRecording) {
+			audioMime = payload.mime || audioMime
+			if (payload.base64) meetingChunks.push(Buffer.from(payload.base64, 'base64'))
+			return
+		}
 		if (!recording && !payload.done) return
 		audioMime = payload.mime || audioMime
 		if (payload.base64) chunks.push(Buffer.from(payload.base64, 'base64'))
 	})
 	ipcMain.on('flow:start-ui', () => void startListening('mouse'))
 	ipcMain.on('flow:stop-ui', () => void stopListening('ui'))
+	ipcMain.on('meeting:start-ui', () => void startMeeting())
+	ipcMain.on('meeting:stop-ui', () => void stopMeeting('ui'))
 	ipcMain.on('flow:hover', (_e, hovering: unknown) => {
 		if (hovering === true) capturePasteTarget()
 		applyPillInteractive(hovering === true)
@@ -471,9 +648,11 @@ export async function boot(): Promise<void> {
 			setup: providerStatus(),
 			providers: Object.entries(PROVIDERS).map(([id, definition]) => ({ id, ...definition })),
 			configuredProviders: STT_PROVIDERS.filter((id) => Boolean(loadProviderToken(id))),
+			llm: llmStatus(),
 		}
 	})
 	ipcMain.handle('onboarding:save-setup', (_event, setup) => saveProviderSetup(setup))
+	ipcMain.handle('onboarding:save-llm', (_event, setup) => saveLlmSetup(setup))
 	ipcMain.handle('permissions:request-mic', async () => {
 		const granted = await requestMicrophone()
 		console.log(`[flow] microphone request → ${granted ? 'granted' : 'denied'}`)
