@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDockVisible, parseScreenTruth, placePillBottomCenter, placementKey, shouldHugBottom, type ScreenTruth } from '../src/main/pillWindow'
+import { isDockVisible, parseScreenTruth, placePillBottomCenter, placementKey, setPillInteractive, shouldHugBottom, type ScreenTruth } from '../src/main/pillWindow'
 
 // macOS pins the top edge of an auxiliary window at y=784 on a fullscreen
 // space while the Dock is enabled (measured on a 1440x900 display, Dock
@@ -21,6 +21,10 @@ function fakeWindow(width = 340, height = 44, clampLine = Number.POSITIVE_INFINI
 		},
 		setPosition(x: number, y: number) {
 			this.pos = [x, Math.min(y, clampLine)]
+		},
+		ignored: [] as Array<{ ignore: boolean; options?: unknown }>,
+		setIgnoreMouseEvents(ignore: boolean, options?: unknown) {
+			this.ignored.push({ ignore, options })
 		},
 	}
 }
@@ -149,6 +153,15 @@ describe('placementKey', () => {
 		expect(placementKey(base, false)).not.toBe(
 			placementKey(truth({ workArea: { x: 0, y: 25, width: 1440, height: 791 } }), false),
 		)
+	})
+})
+
+describe('setPillInteractive', () => {
+	it('takes clicks when on, click-through with forward when off', () => {
+		const win = fakeWindow()
+		setPillInteractive(win as never, true)
+		setPillInteractive(win as never, false)
+		expect(win.ignored).toEqual([{ ignore: false, options: undefined }, { ignore: true, options: { forward: true } }])
 	})
 })
 

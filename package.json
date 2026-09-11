@@ -5,19 +5,22 @@
     "asar": true,
     "asarUnpack": [
       "swift/flow-fn-listener",
-      "swift/flow-fullscreen-check"
+      "swift/flow-fullscreen-check",
+      "swift/flow-frontmost"
     ],
     "directories": {
       "output": "release/"
     },
     "files": [
       "dist/**/*",
+      "history.html",
       "index.html",
       "onboarding.html",
       "package.json",
       "styles/**/*",
       "swift/flow-fn-listener",
-      "swift/flow-fullscreen-check"
+      "swift/flow-fullscreen-check",
+      "swift/flow-frontmost"
     ],
     "mac": {
       "identity": "Flow",
@@ -38,6 +41,7 @@
     "@types/node": "^22.7.0",
     "electron": "^41.2.1",
     "electron-builder": "^26.0.12",
+    "jsdom": "^30.0.1",
     "typescript": "^5.6.3",
     "vitest": "^3.1.0"
   },

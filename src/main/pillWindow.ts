@@ -29,7 +29,7 @@ export function createPillWindow(preloadPath: string, indexPath: string): Browse
 	win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 	win.setAlwaysOnTop(true, 'floating')
 	win.setFullScreenable(false)
-	win.setIgnoreMouseEvents(true, { forward: true })
+	setPillInteractive(win, false)
 	if (process.platform === 'darwin') win.setWindowButtonVisibility(false)
 	if (process.platform === 'darwin' && app.dock) app.dock.hide()
 
@@ -37,10 +37,19 @@ export function createPillWindow(preloadPath: string, indexPath: string): Browse
 	return win
 }
 
-export function resolvePaths(mainDir: string): { preloadPath: string; indexPath: string } {
+// Switches the pill between click-through (mouse falls to the app below) and
+// interactive (the pill receives clicks). Forwarding stays on in click-through
+// mode so mouse moves still reach the renderer.
+export function setPillInteractive(win: BrowserWindow, on: boolean): void {
+	if (on) win.setIgnoreMouseEvents(false)
+	else win.setIgnoreMouseEvents(true, { forward: true })
+}
+
+export function resolvePaths(mainDir: string): { preloadPath: string; indexPath: string; historyPath: string } {
 	return {
 		preloadPath: path.join(mainDir, 'preload.js'),
 		indexPath: path.join(mainDir, '..', '..', 'index.html'),
+		historyPath: path.join(mainDir, '..', '..', 'history.html'),
 	}
 }
 

@@ -1,16 +1,16 @@
 // Post-build step for browser-loaded scripts.
 //
-// src/onboarding.ts and src/renderer.ts run via <script src> with
-// nodeIntegration off, where CommonJS globals like `exports` do not exist.
-// tsc still emits an `Object.defineProperty(exports, ...)` prelude for them,
-// which throws on load and kills the whole script (blank provider list, dead
-// buttons). Strip that prelude and fail the build if either file ever gains
+// src/onboarding.ts, src/renderer.ts, and src/history.ts run via <script src>
+// with nodeIntegration off, where CommonJS globals like `exports` do not
+// exist. tsc still emits an `Object.defineProperty(exports, ...)` prelude for
+// them, which throws on load and kills the whole script (blank provider list,
+// dead buttons). Strip that prelude and fail the build if any file ever gains
 // a real runtime import/require, which needs a bundler instead.
 const fs = require('node:fs')
 const path = require('node:path')
 
 const root = path.join(__dirname, '..')
-const targets = ['dist/src/onboarding.js', 'dist/src/renderer.js']
+const targets = ['dist/src/onboarding.js', 'dist/src/renderer.js', 'dist/src/history.js']
 const prelude = 'Object.defineProperty(exports, "__esModule", { value: true });'
 const forbidden = [/\bexports\b/, /\brequire\s*\(/, /^\s*import\s/m, /^\s*export\s/m]
 

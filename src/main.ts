@@ -1,8 +1,11 @@
 import { ChildProcess, execFile, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { BrowserWindow, Menu, Tray, app, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
+import type { DatabaseSync } from 'node:sqlite'
+import { BrowserWindow, Menu, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
 import { ERROR_VISIBLE_MS, IPC_CHANNELS, type FlowPhase, type FlowState } from './ipc'
+import { activateApp, frontmostApp, resolvePasteTarget, type AppRef } from './main/focus'
+import { type HistoryListOptions, clearHistory, getHistoryDbPath, listTranscriptions, openHistoryDb, recordTranscription } from './main/history'
 import { insertTextAtCursor } from './main/inserter'
 import { checkForUpdates } from './main/updates'
 import {
@@ -13,7 +16,7 @@ import {
 	report,
 	requestMicrophone,
 } from './main/permissions'
-import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
+import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
 import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, loadProviderToken, loadSettings, providerStatus, saveProviderSetup } from './main/settings'
 import { SttError, createSttProvider } from './services/stt'
 
@@ -86,10 +89,38 @@ function buildTrayMenu(): Menu {
 	items.push(
 		{ label: 'Setup & permissions…', click: () => showOnboarding() },
 		{ label: 'How to use Flow…', click: () => showHowToUse() },
+		{ label: 'History…', click: () => openHistoryWindow() },
 		{ label: 'Edit settings.json', click: () => shell.openPath(app.getPath('userData')) },
 		{ label: 'Quit', click: () => app.quit() },
 	)
 	return Menu.buildFromTemplate(items)
+}
+
+let historyWin: BrowserWindow | null = null
+let historyDb: DatabaseSync | null = null
+let lastStartSource = ''
+
+function openHistoryWindow(): void {
+	if (historyWin && !historyWin.isDestroyed()) {
+		historyWin.focus()
+		return
+	}
+	const { preloadPath, historyPath } = resolvePaths(__dirname)
+	historyWin = new BrowserWindow({
+		width: 520,
+		height: 640,
+		minWidth: 360,
+		minHeight: 400,
+		title: 'Flow History',
+		backgroundColor: '#1e1e20',
+		webPreferences: { preload: preloadPath },
+		show: false,
+	})
+	void historyWin.loadFile(historyPath)
+	historyWin.once('ready-to-show', () => historyWin?.show())
+	historyWin.on('closed', () => {
+		historyWin = null
+	})
 }
 
 function refreshTrayMenu(): void {
@@ -166,6 +197,45 @@ function showPill(): void {
 	void updatePillPlacement()
 }
 
+let pillInteractive = false
+let appBeforeMouse: AppRef | null = null
+let mouseInitiated = false
+let focusRefresh: NodeJS.Timeout | null = null
+
+// Clicking the pill activates Flow, stealing frontmost status from the app
+// the user dictates into — so the pre-click app is captured (synchronously:
+// event-loop serialization guarantees this read lands before activation)
+// and re-activated before pasting. Refreshed while hovered in case the user
+// switches apps mid-hover via keyboard.
+function capturePasteTarget(): void {
+	const front = frontmostApp()
+	if (front && front.pid !== process.pid) appBeforeMouse = front
+}
+
+// The renderer detects hover (forwarded mouse moves arrive even in
+// click-through mode) and reports it; main just mirrors the mode. Deduped:
+// redundant setIgnoreMouseEvents calls are skipped.
+function applyPillInteractive(on: boolean): void {
+	if (on === pillInteractive || !pill || pill.isDestroyed()) return
+	pillInteractive = on
+	console.log(`[flow] pill interactive: ${on ? 'on' : 'off'}`)
+	setPillInteractive(pill, on)
+	if (focusRefresh) {
+		clearInterval(focusRefresh)
+		focusRefresh = null
+	}
+	if (on) {
+		focusRefresh = setInterval(capturePasteTarget, 1000)
+	}
+}
+
+async function ensurePasteTarget(): Promise<void> {
+	const target = resolvePasteTarget(frontmostApp(), process.pid, appBeforeMouse, mouseInitiated)
+	if (!target) return
+	console.log(`[flow] restoring paste target: ${target.bundleId}`)
+	if (activateApp(target)) await new Promise((r) => setTimeout(r, 400))
+}
+
 // macOS exposes no Dock-changed event, so poll: the sidecar re-reads real
 // geometry as the Dock shows, hides, or resizes and as fullscreen toggles,
 // and the pill follows it.
@@ -178,6 +248,8 @@ async function startListening(source: string): Promise<void> {
 	if (recording || updating || !pill) return
 	console.log(`[flow] start listening (source=${source})`)
 	recording = true
+	mouseInitiated = source === 'mouse'
+	lastStartSource = source
 	chunks = []
 	seconds = 0
 	const { maxSeconds } = loadSettings()
@@ -211,6 +283,14 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 		const provider = createSttProvider(settings)
 		const ext = audioMime.includes('wav') ? 'wav' : 'webm'
 		const text = await provider.transcribe({ audio, filename: `flow.${ext}`, mimeType: audioMime, language: settings.language || undefined })
+		if (historyDb && text) {
+			try {
+				recordTranscription(historyDb, { text, provider: settings.provider, source: lastStartSource })
+			} catch (error) {
+				console.log(`[flow] history record failed: ${error instanceof Error ? error.message : error}`)
+			}
+		}
+		await ensurePasteTarget()
 		await insertTextAtCursor(text)
 		setState({ phase: 'idle' })
 	} catch (error) {
@@ -220,6 +300,7 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 		if (reason === 'timeout') void dialog.showMessageBox({ type: 'warning', message: `Flow stopped: ${msg}` })
 	} finally {
 		chunks = []
+		mouseInitiated = false
 		showPill()
 	}
 }
@@ -227,6 +308,7 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 function cancelListening(): void {
 	if (!recording) return
 	recording = false
+	mouseInitiated = false
 	chunks = []
 	if (stopTimer) clearTimeout(stopTimer)
 	if (secondsTimer) clearInterval(secondsTimer)
@@ -283,7 +365,7 @@ function showHowToUse(): void {
 		type: 'info',
 		title: 'How to use Flow',
 		message: 'Hold fn, speak, release — text lands at your cursor.',
-		detail: '⌥Space starts/stops as a fallback.\nEsc cancels while listening.\nListening stops automatically at the time limit.\nChange provider, model, or language anytime via Setup & permissions…',
+		detail: '⌥Space starts/stops as a fallback.\nEsc cancels while listening.\nListening stops automatically at the time limit.\nHover the pill to expand it — hold to talk, or double-click to keep recording until you click again.\nChange provider, model, or language anytime via Setup & permissions…',
 		buttons: ['Got it'],
 	})
 }
@@ -351,6 +433,12 @@ function registerFallbackShortcut(): void {
 export async function boot(): Promise<void> {
 	await app.whenReady()
 
+	try {
+		historyDb = openHistoryDb(getHistoryDbPath())
+	} catch (error) {
+		console.log(`[flow] history db unavailable: ${error instanceof Error ? error.message : error}`)
+	}
+
 	tray = new Tray(nativeImage.createEmpty())
 	tray.setTitle('◉')
 	tray.setToolTip('Flow — hold fn to dictate')
@@ -361,8 +449,18 @@ export async function boot(): Promise<void> {
 		audioMime = payload.mime || audioMime
 		if (payload.base64) chunks.push(Buffer.from(payload.base64, 'base64'))
 	})
-	ipcMain.on('flow:start-ui', () => void startListening('shortcut'))
+	ipcMain.on('flow:start-ui', () => void startListening('mouse'))
+	ipcMain.on('flow:stop-ui', () => void stopListening('ui'))
+	ipcMain.on('flow:hover', (_e, hovering: unknown) => {
+		if (hovering === true) capturePasteTarget()
+		applyPillInteractive(hovering === true)
+	})
 	ipcMain.on('flow:cancel', () => cancelListening())
+	ipcMain.handle('history:list', (_e, opts: unknown) => (historyDb ? listTranscriptions(historyDb, (opts ?? {}) as HistoryListOptions) : { rows: [], total: 0 }))
+	ipcMain.handle('history:clear', () => (historyDb ? clearHistory(historyDb) : 0))
+	ipcMain.on('history:copy', (_e, text: unknown) => {
+		if (typeof text === 'string' && text) clipboard.writeText(text)
+	})
 	ipcMain.handle('onboarding:get', async () => {
 		const permissions = await report()
 		// Helper spawned before the grant exits denied and is never retried; a
@@ -403,6 +501,11 @@ app.on('will-quit', () => {
 	globalShortcut.unregisterAll()
 	try {
 		fnHelper?.kill()
+	} catch {
+		// ignore
+	}
+	try {
+		historyDb?.close()
 	} catch {
 		// ignore
 	}

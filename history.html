@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flow History</title>
+<link rel="stylesheet" href="./styles/history.css" />
+</head>
+<body>
+<header><h1>History</h1><button id="clear" type="button">Clear</button></header>
+<input id="filter" type="search" placeholder="Filter…" autocomplete="off" />
+<div id="list"></div>
+<div id="empty" hidden>No transcriptions yet.</div>
+<div id="dock"><div id="pager"><button id="prev" type="button">‹ Prev</button><span id="pageinfo"></span><button id="next" type="button">Next ›</button></div>
+<footer>Stored locally on this Mac · newest first</footer></div>
+<script src="./dist/src/history.js"></script>
+</body>
+</html>

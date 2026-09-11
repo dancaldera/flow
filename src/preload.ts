@@ -21,8 +21,16 @@ contextBridge.exposeInMainWorld('flow', {
 		ipcRenderer.on(channel, () => cb())
 	},
 	start: () => ipcRenderer.send('flow:start-ui'),
+	stop: () => ipcRenderer.send('flow:stop-ui'),
+	setHover: (hovering: boolean) => ipcRenderer.send('flow:hover', hovering),
 	audioChunk: (base64: string, mime: string, done: boolean) => ipcRenderer.send('flow:audio', { base64, mime, done }),
 	cancel: () => ipcRenderer.send('flow:cancel'),
+})
+
+contextBridge.exposeInMainWorld('flowHistory', {
+	list: (opts?: { limit?: number; offset?: number; query?: string }) => ipcRenderer.invoke('history:list', opts ?? {}),
+	clear: () => ipcRenderer.invoke('history:clear'),
+	copy: (text: string) => ipcRenderer.send('history:copy', text),
 })
 
 contextBridge.exposeInMainWorld('flowSetup', {

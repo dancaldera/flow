@@ -1,6 +1,6 @@
 html, body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, system-ui, sans-serif; }
 body { min-height: 100vh; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 16px; }
-#pill { display: flex; gap: 6px; align-items: center; box-sizing: border-box; background: rgba(30, 30, 32, 0.92); color: #fff; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; padding: 4px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); -webkit-app-region: no-drag; transition: background-color 0.25s, border-color 0.25s, box-shadow 0.25s, min-width 0.25s; }
+#pill { display: flex; gap: 6px; align-items: center; box-sizing: border-box; background: rgba(30, 30, 32, 0.92); color: #fff; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 999px; padding: 4px 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); -webkit-app-region: no-drag; user-select: none; -webkit-user-select: none; transition: background-color 0.25s, border-color 0.25s, box-shadow 0.25s, min-width 0.25s; }
 body[data-phase="idle"] #pill { min-width: 80px; background: rgba(128, 128, 128, 0.22); border-color: rgba(255, 255, 255, 0.1); box-shadow: none; }
 body[data-phase="idle"] .dot { display: none; }
 #hint { font-size: 11px; opacity: 0.85; white-space: nowrap; }
@@ -11,3 +11,12 @@ body[data-phase="idle"] .dot { display: none; }
 .dot.busy { background: #ffd60a; }
 .dot.err { background: #ff9f0a; }
 @keyframes pulse { 50% { opacity: 0.35; } }
+#cta { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; font-size: 11px; transition: max-width 0.2s ease-out, opacity 0.18s ease-out; }
+body[data-hover="true"] #pill { cursor: pointer; }
+body[data-phase="idle"][data-hover="true"] #pill { min-width: 200px; background: rgba(48, 48, 54, 0.95); border-color: rgba(255, 255, 255, 0.22); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+body[data-phase="idle"][data-hover="true"] .dot { display: block; background: #30d158; }
+body[data-phase="idle"][data-hover="true"] #cta { max-width: 140px; opacity: 0.9; }
+#cta-alt { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; font-size: 11px; transition: max-width 0.2s ease-out, opacity 0.18s ease-out; }
+#cta-alt::before { content: "·"; margin: 0 6px 0 2px; }
+body[data-phase="idle"][data-hover="true"] #cta-alt { max-width: 170px; opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { #pill, #cta, #cta-alt, .dot { transition: none; animation: none; } }
