@@ -58,12 +58,15 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 async function startCapture(): Promise<void> {
 	try {
-		// echoCancellation routes capture through macOS voice processing, which
-		// subtracts the default output's audio (music, calls, alerts on speakers
-		// or leaking from headphones) from the mic signal; noiseSuppression and
-		// autoGainControl keep the remaining signal clean and steady for STT.
+		// Input-only processing: noiseSuppression and autoGainControl run in
+		// software on the captured signal alone. echoCancellation is deliberately
+		// NOT requested — on macOS it routes capture through voice processing,
+		// which claims the output device as the echo reference and audibly
+		// changes whatever is playing (sample-rate/EQ reconfiguration, worst on
+		// Bluetooth headsets). Playback stays untouched; speaker bleed is
+		// covered by the opt-in system-audio mute instead.
 		stream = await navigator.mediaDevices.getUserMedia({
-			audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+			audio: { channelCount: 1, sampleRate: 16000, noiseSuppression: true, autoGainControl: true },
 		})
 		mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
 		recorder = new MediaRecorder(stream, { mimeType: mime })
