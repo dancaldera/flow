@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Flow app icon: macOS-style rounded square -->
+  <defs>
+    <linearGradient id="flow-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0b1120"/>
+    </linearGradient>
+    <radialGradient id="flow-glow" cx=".28" cy=".18" r="1">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity=".18"/>
+      <stop offset=".5" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flow-stroke" gradientUnits="userSpaceOnUse" x1="88" y1="256" x2="424" y2="256">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset=".55" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="115" fill="url(#flow-bg)"/>
+  <rect width="512" height="512" rx="115" fill="url(#flow-glow)"/>
+  <rect x="1.5" y="1.5" width="509" height="509" rx="113.5" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="3"/>
+
+  <g fill="none" stroke="url(#flow-stroke)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M88 256
+             C102 256 102 166 120 166
+             C138 166 138 256 152 256
+             C166 256 166 386 184 386
+             C202 386 202 256 216 256
+             C230 256 230 176 246 176
+             C262 176 262 256 278 256
+             L424 256"/>
+    <path d="M278 318 H424"/>
+    <path d="M278 380 H372"/>
+  </g>
+</svg>
