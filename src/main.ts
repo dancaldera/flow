@@ -18,7 +18,8 @@ import {
 	requestMicrophone,
 } from './main/permissions'
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
-import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveLlmSetup, resolveProviderSetup, saveLlmSetup, saveProviderSetup } from './main/settings'
+import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveLlmSetup, resolveProviderSetup, saveLlmSetup, saveProviderSetup, saveSettings } from './main/settings'
+import { muteSystemAudio, restoreSystemAudio, restoreSystemAudioSync } from './main/systemAudio'
 import { createLlmClient } from './services/llm'
 import { SttError, createSttProvider, testSttProvider } from './services/stt'
 
@@ -89,6 +90,12 @@ function buildTrayMenu(): Menu {
 		},
 	})
 	items.push(
+		{
+			label: 'Mute system audio while listening',
+			type: 'checkbox',
+			checked: loadSettings().muteSystemAudio === true,
+			click: (item) => saveSettings({ ...loadSettings(), muteSystemAudio: item.checked }),
+		},
 		{ label: 'Setup & permissions…', click: () => showOnboarding() },
 		{ label: 'How to use Flow…', click: () => showHowToUse() },
 		{ label: 'History…', click: () => openHistoryWindow() },
@@ -254,7 +261,10 @@ async function startListening(source: string): Promise<void> {
 	lastStartSource = source
 	chunks = []
 	seconds = 0
-	const { maxSeconds } = loadSettings()
+	const { maxSeconds, muteSystemAudio: mute } = loadSettings()
+	// Async on purpose: capture starts immediately, the mute lands ~100ms in —
+	// the stray first tenth of a second never carries speech worth keeping.
+	if (mute) void muteSystemAudio()
 	showPill()
 	setState({ phase: 'listening', seconds: 0 })
 	pill.webContents.send(IPC_CHANNELS.FLOW_START)
@@ -275,6 +285,8 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 	if (secondsTimer) clearInterval(secondsTimer)
 	setState({ phase: 'working', message: 'Transcribing…' })
 	pill.webContents.send(IPC_CHANNELS.FLOW_STOP)
+	// Capture is over — hand the user's audio back before transcription runs.
+	void restoreSystemAudio()
 
 	// Wait briefly for the renderer's final audio chunk.
 	await new Promise((r) => setTimeout(r, 400))
@@ -321,6 +333,7 @@ function cancelListening(): void {
 	if (stopTimer) clearTimeout(stopTimer)
 	if (secondsTimer) clearInterval(secondsTimer)
 	pill?.webContents.send(IPC_CHANNELS.FLOW_CANCEL)
+	void restoreSystemAudio()
 	setState({ phase: 'idle' })
 	showPill()
 }
@@ -690,6 +703,7 @@ void boot()
 
 app.on('will-quit', () => {
 	globalShortcut.unregisterAll()
+	restoreSystemAudioSync()
 	try {
 		fnHelper?.kill()
 	} catch {

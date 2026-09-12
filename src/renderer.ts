@@ -58,7 +58,13 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 async function startCapture(): Promise<void> {
 	try {
-		stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } })
+		// echoCancellation routes capture through macOS voice processing, which
+		// subtracts the default output's audio (music, calls, alerts on speakers
+		// or leaking from headphones) from the mic signal; noiseSuppression and
+		// autoGainControl keep the remaining signal clean and steady for STT.
+		stream = await navigator.mediaDevices.getUserMedia({
+			audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+		})
 		mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
 		recorder = new MediaRecorder(stream, { mimeType: mime })
 		recorder.ondataavailable = (event: BlobEvent) => {

@@ -193,6 +193,9 @@ export interface FlowSettings {
 	model: string
 	language: string
 	maxSeconds: number
+	// Opt-in (tray checkbox): mute macOS output while dictating so playing
+	// audio cannot bleed into the recording. Meeting mode never mutes.
+	muteSystemAudio: boolean
 	llmBaseUrl: string
 	llmModel: string
 }
@@ -207,6 +210,7 @@ const DEFAULTS: FlowSettings = {
 	model: PROVIDERS.cloudflare.defaultModel,
 	language: '',
 	maxSeconds: 60,
+	muteSystemAudio: false,
 	llmBaseUrl: DEFAULT_LLM_BASE_URL,
 	llmModel: DEFAULT_LLM_MODEL,
 }
@@ -250,7 +254,8 @@ export function loadSettings(): FlowSettings {
 		const language = hasProvider ? resolveLanguage(provider, model, saved.language) : ''
 		const llmBaseUrl = saved.llmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL
 		const llmModel = saved.llmModel?.trim() || DEFAULT_LLM_MODEL
-		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel }
+		const muteSystemAudio = saved.muteSystemAudio === true
+		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel, muteSystemAudio }
 	} catch {
 		const provider = detectedEnvironmentProvider()
 		return { ...DEFAULTS, provider, model: PROVIDERS[provider].defaultModel }
