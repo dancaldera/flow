@@ -3,8 +3,14 @@
 	--pill-radius: 999px;
 	--pill-font-size: 11px;
 	--pill-gap: 5px;
-	--pill-ease: cubic-bezier(0.16, 1, 0.3, 1);
-	--pill-duration: 0.2s;
+	--pill-dot: 6px;
+	--pill-pad: 8px;
+	/* Text is centered inside the pill, so the room the dot takes on the left is
+	   mirrored on the right; the dot itself is out of flow. */
+	--pill-pad-inner: calc(var(--pill-pad) + var(--pill-dot) + var(--pill-gap));
+	--pill-green: #15803d;
+	/* One duration/easing pair drives every pill transition. */
+	--pill-anim: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html, body {
@@ -25,34 +31,35 @@ body {
 }
 
 #pill {
+	position: relative;
 	display: flex;
-	gap: var(--pill-gap);
 	align-items: center;
+	justify-content: center;
 	box-sizing: border-box;
 	height: var(--pill-height);
-	padding: 0 8px;
-	background: rgba(30, 30, 32, 0.92);
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
+	padding: 0 var(--pill-pad-inner);
+	background: rgba(30, 30, 32, 0.72);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
 	color: #fff;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: var(--pill-radius);
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 	-webkit-app-region: no-drag;
 	user-select: none;
 	-webkit-user-select: none;
-	transition: min-width var(--pill-duration) var(--pill-ease),
-	            background-color var(--pill-duration) ease,
-	            border-color var(--pill-duration) ease,
-	            box-shadow var(--pill-duration) ease,
-	            transform 0.12s ease;
+	transition: min-width var(--pill-anim),
+	            background-color var(--pill-anim),
+	            border-color var(--pill-anim),
+	            box-shadow var(--pill-anim),
+	            transform var(--pill-anim);
 }
 
 /* Idle state */
 body[data-phase="idle"] #pill {
 	min-width: 60px;
-	background: rgba(128, 128, 128, 0.22);
-	border-color: rgba(255, 255, 255, 0.1);
+	background: rgba(128, 128, 128, 0.14);
+	border-color: rgba(255, 255, 255, 0.08);
 	box-shadow: none;
 }
 
@@ -63,34 +70,31 @@ body[data-hover="true"] #pill {
 
 body[data-phase="idle"][data-hover="true"] #pill {
 	min-width: 190px;
-	padding: 0 9px;
-	background: rgba(48, 48, 54, 0.95);
-	border-color: rgba(255, 255, 255, 0.22);
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+	background: rgba(48, 48, 54, 0.78);
+	border-color: rgba(255, 255, 255, 0.2);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 #pill:active {
 	transform: scale(0.97);
 }
 
-/* Dot indicator */
+/* Dot indicator: pinned in the left gutter so it never shifts the text */
 .dot {
-	width: 6px;
-	height: 6px;
+	position: absolute;
+	left: var(--pill-pad);
+	top: calc(50% - var(--pill-dot) / 2);
+	width: var(--pill-dot);
+	height: var(--pill-dot);
 	border-radius: 50%;
-	flex-shrink: 0;
-	transition: opacity var(--pill-duration) ease,
-	            transform var(--pill-duration) var(--pill-ease),
-	            width var(--pill-duration) var(--pill-ease),
-	            margin var(--pill-duration) var(--pill-ease),
-	            background-color var(--pill-duration) ease;
+	transition: opacity var(--pill-anim),
+	            transform var(--pill-anim),
+	            background-color var(--pill-anim);
 }
 
 body[data-phase="idle"] .dot {
 	opacity: 0;
 	transform: scale(0.4);
-	width: 0;
-	margin-right: calc(-1 * var(--pill-gap));
 	pointer-events: none;
 }
 
@@ -98,20 +102,13 @@ body[data-phase="idle"][data-hover="true"] .dot,
 body[data-phase="idle"][data-meeting="true"] .dot {
 	opacity: 1;
 	transform: scale(1);
-	width: 6px;
-	margin-right: 0;
-	background: #30d158;
+	background: var(--pill-green);
 }
 
-.dot.idle { background: #666; }
-.dot.live {
-	background: #ff453a;
-	animation: pulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-.dot.busy {
-	background: #ffd60a;
-	animation: pulse 1s ease-in-out infinite;
-}
+.dot.idle { background: var(--pill-green); }
+.dot.live, .dot.busy { animation: pulse 1.2s ease-in-out infinite; }
+.dot.live { background: #ff453a; }
+.dot.busy { background: #ffd60a; }
 .dot.err { background: #ff9f0a; }
 
 @keyframes pulse {
@@ -127,34 +124,42 @@ body[data-phase="idle"][data-meeting="true"] .dot {
 
 /* Text elements */
 #texts {
-	display: contents;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 0;
 }
 
 #hint {
 	font-size: var(--pill-font-size);
-	line-height: var(--pill-height);
+	line-height: 1;
 	opacity: 0.9;
 	white-space: nowrap;
 	letter-spacing: -0.01em;
+	text-align: center;
 }
 
 #hint:empty {
 	display: none;
 }
 
-/* Call-to-action hints */
+/* Call-to-action hints. Spacing lives on the items rather than a container
+   `gap`: a collapsed hint still participates in layout, and its share of the
+   gap would push the centered status text off-center. */
 #cta, #cta-alt, #meet {
 	display: inline-block;
 	max-width: 0;
+	margin-left: 0;
 	opacity: 0;
 	overflow: hidden;
 	white-space: nowrap;
 	font-size: var(--pill-font-size);
-	line-height: var(--pill-height);
+	line-height: 1;
 	letter-spacing: -0.01em;
 	pointer-events: none;
-	transition: max-width var(--pill-duration) var(--pill-ease),
-	            opacity 0.15s ease;
+	transition: max-width var(--pill-anim),
+	            margin-left var(--pill-anim),
+	            opacity var(--pill-anim);
 }
 
 body[data-phase="idle"][data-hover="true"] #cta,
@@ -181,9 +186,8 @@ body[data-phase="idle"][data-hover="true"] #cta-alt {
 /* Meeting suggestion */
 body[data-phase="idle"][data-meeting="true"] #pill {
 	min-width: 140px;
-	padding: 0 9px;
-	background: rgba(48, 48, 54, 0.92);
-	border-color: rgba(48, 209, 88, 0.35);
+	background: rgba(48, 48, 54, 0.72);
+	border-color: rgba(21, 128, 61, 0.55);
 }
 
 body[data-phase="idle"][data-meeting="true"] #meet {
@@ -197,6 +201,9 @@ body[data-phase="idle"][data-meeting="true"][data-hover="true"] #pill {
 
 body[data-phase="idle"][data-meeting="true"][data-hover="true"] #meet {
 	max-width: 260px;
+	/* Separates the teaser from the latch hint it follows (DOM order: cta,
+	   cta-alt, meet). */
+	margin-left: var(--pill-gap);
 }
 
 body[data-phase="idle"][data-meeting="true"][data-hover="true"] #meet::after {

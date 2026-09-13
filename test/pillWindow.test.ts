@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isDockVisible, parseScreenTruth, placePillBottomCenter, placementKey, setPillInteractive, shouldHugBottom, type ScreenTruth } from '../src/main/pillWindow'
+import { isDockVisible, parseScreenTruth, PILL_WINDOW_WIDTH, placePillBottomCenter, placementKey, setPillInteractive, shouldHugBottom, type ScreenTruth } from '../src/main/pillWindow'
 
 // macOS pins the top edge of an auxiliary window at y=784 on a fullscreen
 // space while the Dock is enabled (measured on a 1440x900 display, Dock
@@ -37,6 +37,16 @@ function truth(overrides?: Partial<ScreenTruth>): ScreenTruth {
 		...overrides,
 	}
 }
+
+describe('PILL_WINDOW_WIDTH', () => {
+	it('fits the widest pill state so centered status text is never clipped', () => {
+		// Measured offscreen at 2x from the real index.html + pill.css: the
+		// widest state is idle + hover + the meeting teaser (all three hints
+		// visible) at 401px. A narrower window squeezes the pill, and the
+		// overflow-hidden hints then clip their own text.
+		expect(PILL_WINDOW_WIDTH).toBeGreaterThanOrEqual(401)
+	})
+})
 
 describe('placePillBottomCenter', () => {
 	it('sits just above a visible Dock', () => {

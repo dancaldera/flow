@@ -1,9 +1,16 @@
 import { BrowserWindow, app, type Rectangle } from 'electron'
 import * as path from 'node:path'
 
+// Wide enough for the widest pill state: idle + hover + the meeting teaser
+// renders 401px (measured offscreen at 2x from the real index.html + pill.css).
+// In a narrower window the pill is squeezed to the window width, the flex items
+// shrink, and the overflow-hidden hints clip their own text — at the previous
+// 340px the teaser lost its trailing "· click to start".
+export const PILL_WINDOW_WIDTH = 420
+
 export function createPillWindow(preloadPath: string, indexPath: string): BrowserWindow {
 	const win = new BrowserWindow({
-		width: 340,
+		width: PILL_WINDOW_WIDTH,
 		height: 44,
 		frame: false,
 		transparent: true,
