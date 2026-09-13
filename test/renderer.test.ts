@@ -10,6 +10,7 @@ const calls: Array<{ method: string; arg?: unknown }> = []
 let stateCb: ((s: FlowState) => void) | null = null
 let suggestCb: ((suggest: boolean) => void) | null = null
 let activeCb: ((active: boolean) => void) | null = null
+const commandCbs: Partial<Record<'start' | 'stop' | 'cancel', () => void>> = {}
 
 async function loadRenderer(): Promise<void> {
 	// Fresh DOM per test; the renderer binds at import time.
@@ -19,11 +20,14 @@ async function loadRenderer(): Promise<void> {
 	stateCb = null
 	suggestCb = null
 	activeCb = null
+	for (const command of ['start', 'stop', 'cancel'] as const) delete commandCbs[command]
 	;(window as unknown as { flow: unknown }).flow = {
 		onState: (cb: (s: FlowState) => void) => {
 			stateCb = cb
 		},
-		onCommand: () => {},
+		onCommand: (command: 'start' | 'stop' | 'cancel', cb: () => void) => {
+			commandCbs[command] = cb
+		},
 		onMeetingSuggest: (cb: (suggest: boolean) => void) => {
 			suggestCb = cb
 		},
@@ -112,6 +116,36 @@ describe('pill hover', () => {
 		setPhase('listening')
 		enter()
 		expect(document.body.dataset.hover).toBe('false')
+	})
+})
+
+describe('audio capture', () => {
+	it('avoids the Bluetooth output device when choosing a microphone', async () => {
+		const enumerateDevices = vi.fn().mockResolvedValue([
+			{ kind: 'audioinput', deviceId: 'default', groupId: 'headset', label: 'Default' },
+			{ kind: 'audioinput', deviceId: 'beats-mic', groupId: 'headset', label: 'Beats Studio Buds' },
+			{ kind: 'audiooutput', deviceId: 'default', groupId: 'headset', label: 'Default' },
+			{ kind: 'audioinput', deviceId: 'mac-mic', groupId: 'mac', label: 'MacBook Air Microphone' },
+		])
+		const getUserMedia = vi.fn().mockRejectedValue(new Error('stop after constraints'))
+		Object.defineProperty(navigator, 'mediaDevices', {
+			configurable: true,
+			value: { enumerateDevices, getUserMedia },
+		})
+
+		commandCbs.start?.()
+		await vi.waitFor(() =>
+			expect(getUserMedia).toHaveBeenCalledWith({
+				audio: {
+					deviceId: { exact: 'mac-mic' },
+					channelCount: 1,
+					sampleRate: 16000,
+					echoCancellation: false,
+					noiseSuppression: false,
+					autoGainControl: false,
+				},
+			}),
+		)
 	})
 })
 

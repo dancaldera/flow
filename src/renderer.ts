@@ -58,15 +58,24 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 async function startCapture(): Promise<void> {
 	try {
-		// Input-only processing: noiseSuppression and autoGainControl run in
-		// software on the captured signal alone. echoCancellation is deliberately
-		// NOT requested — on macOS it routes capture through voice processing,
-		// which claims the output device as the echo reference and audibly
-		// changes whatever is playing (sample-rate/EQ reconfiguration, worst on
-		// Bluetooth headsets). Playback stays untouched; speaker bleed is
-		// covered by the opt-in system-audio mute instead.
+		const devices = await navigator.mediaDevices.enumerateDevices()
+		const defaultOutputGroup = devices.find((device) => device.kind === 'audiooutput' && device.deviceId === 'default')?.groupId
+		const inputs = devices.filter((device) => device.kind === 'audioinput' && device.deviceId !== 'default')
+		// Opening a Bluetooth headset mic forces its playback into low-quality
+		// hands-free mode. Prefer the Mac mic, otherwise any mic outside the
+		// current output device.
+		const input =
+			inputs.find((device) => /MacBook|iMac|Studio Display|built-in|internal/i.test(device.label)) ??
+			(defaultOutputGroup ? inputs.find((device) => device.groupId !== defaultOutputGroup) : undefined)
 		stream = await navigator.mediaDevices.getUserMedia({
-			audio: { channelCount: 1, sampleRate: 16000, noiseSuppression: true, autoGainControl: true },
+			audio: {
+				...(input ? { deviceId: { exact: input.deviceId } } : {}),
+				channelCount: 1,
+				sampleRate: 16000,
+				echoCancellation: false,
+				noiseSuppression: false,
+				autoGainControl: false,
+			},
 		})
 		mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
 		recorder = new MediaRecorder(stream, { mimeType: mime })
