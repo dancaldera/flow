@@ -1,6 +1,5 @@
 :root {
 	--pill-height: 20px;
-	--pill-radius: 999px;
 	--pill-font-size: 11px;
 	--pill-gap: 5px;
 	--pill-dot: 6px;
@@ -38,48 +37,45 @@ body {
 	box-sizing: border-box;
 	height: var(--pill-height);
 	padding: 0 var(--pill-pad-inner);
-	background: rgba(30, 30, 32, 0.72);
-	backdrop-filter: blur(20px);
-	-webkit-backdrop-filter: blur(20px);
+	/* Black glass: the darker the tint, the less opaque it needs to be — the
+	   blur carries legibility, not the background. */
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(24px) saturate(140%);
+	-webkit-backdrop-filter: blur(24px) saturate(140%);
 	color: #fff;
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	border-radius: var(--pill-radius);
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 999px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 	-webkit-app-region: no-drag;
 	user-select: none;
 	-webkit-user-select: none;
-	transition: min-width var(--pill-anim),
-	            background-color var(--pill-anim),
-	            border-color var(--pill-anim),
-	            box-shadow var(--pill-anim),
-	            transform var(--pill-anim);
+	transition: all var(--pill-anim);
 }
 
-/* Idle state */
+/* Idle: a faint empty capsule that only wakes under the cursor. */
 body[data-phase="idle"] #pill {
 	min-width: 60px;
-	background: rgba(128, 128, 128, 0.14);
-	border-color: rgba(255, 255, 255, 0.08);
+	background: rgba(0, 0, 0, 0.22);
+	border-color: rgba(255, 255, 255, 0.06);
 	box-shadow: none;
 }
 
-/* Hover state */
 body[data-hover="true"] #pill {
 	cursor: pointer;
 }
 
 body[data-phase="idle"][data-hover="true"] #pill {
 	min-width: 190px;
-	background: rgba(48, 48, 54, 0.78);
-	border-color: rgba(255, 255, 255, 0.2);
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+	background: rgba(0, 0, 0, 0.62);
+	border-color: rgba(255, 255, 255, 0.18);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 #pill:active {
 	transform: scale(0.97);
 }
 
-/* Dot indicator: pinned in the left gutter so it never shifts the text */
+/* Dot indicator: pinned in the left gutter so it never shifts the text. */
 .dot {
 	position: absolute;
 	left: var(--pill-pad);
@@ -87,29 +83,28 @@ body[data-phase="idle"][data-hover="true"] #pill {
 	width: var(--pill-dot);
 	height: var(--pill-dot);
 	border-radius: 50%;
-	transition: opacity var(--pill-anim),
-	            transform var(--pill-anim),
-	            background-color var(--pill-anim);
+	transition: all var(--pill-anim);
 }
 
 body[data-phase="idle"] .dot {
 	opacity: 0;
 	transform: scale(0.4);
-	pointer-events: none;
 }
 
 body[data-phase="idle"][data-hover="true"] .dot,
 body[data-phase="idle"][data-meeting="true"] .dot {
 	opacity: 1;
 	transform: scale(1);
-	background: var(--pill-green);
 }
 
 .dot.idle { background: var(--pill-green); }
-.dot.live, .dot.busy { animation: pulse 1.2s ease-in-out infinite; }
 .dot.live { background: #ff453a; }
 .dot.busy { background: #ffd60a; }
 .dot.err { background: #ff9f0a; }
+
+.dot.live, .dot.busy {
+	animation: pulse 1.2s ease-in-out infinite;
+}
 
 @keyframes pulse {
 	0%, 100% {
@@ -122,7 +117,6 @@ body[data-phase="idle"][data-meeting="true"] .dot {
 	}
 }
 
-/* Text elements */
 #texts {
 	display: flex;
 	align-items: center;
@@ -130,12 +124,15 @@ body[data-phase="idle"][data-meeting="true"] .dot {
 	min-width: 0;
 }
 
-#hint {
+#hint, #cta, #cta-alt, #meet {
 	font-size: var(--pill-font-size);
 	line-height: 1;
+	letter-spacing: -0.01em;
+}
+
+#hint {
 	opacity: 0.9;
 	white-space: nowrap;
-	letter-spacing: -0.01em;
 	text-align: center;
 }
 
@@ -153,13 +150,8 @@ body[data-phase="idle"][data-meeting="true"] .dot {
 	opacity: 0;
 	overflow: hidden;
 	white-space: nowrap;
-	font-size: var(--pill-font-size);
-	line-height: 1;
-	letter-spacing: -0.01em;
 	pointer-events: none;
-	transition: max-width var(--pill-anim),
-	            margin-left var(--pill-anim),
-	            opacity var(--pill-anim);
+	transition: all var(--pill-anim);
 }
 
 body[data-phase="idle"][data-hover="true"] #cta,
@@ -186,7 +178,7 @@ body[data-phase="idle"][data-hover="true"] #cta-alt {
 /* Meeting suggestion */
 body[data-phase="idle"][data-meeting="true"] #pill {
 	min-width: 140px;
-	background: rgba(48, 48, 54, 0.72);
+	background: rgba(0, 0, 0, 0.55);
 	border-color: rgba(21, 128, 61, 0.55);
 }
 
