@@ -255,7 +255,11 @@ export function loadSettings(): FlowSettings {
 		const llmBaseUrl = saved.llmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL
 		const llmModel = saved.llmModel?.trim() || DEFAULT_LLM_MODEL
 		const muteSystemAudio = saved.muteSystemAudio === true
-		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel, muteSystemAudio }
+		const maxSeconds =
+			typeof saved.maxSeconds === 'number' && Number.isFinite(saved.maxSeconds) && saved.maxSeconds > 0
+				? Math.floor(saved.maxSeconds)
+				: DEFAULTS.maxSeconds
+		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel, muteSystemAudio, maxSeconds }
 	} catch {
 		const provider = detectedEnvironmentProvider()
 		return { ...DEFAULTS, provider, model: PROVIDERS[provider].defaultModel }

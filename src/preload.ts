@@ -9,7 +9,6 @@ const IPC_CHANNELS = {
 	FLOW_START: 'flow:start',
 	FLOW_STOP: 'flow:stop',
 	FLOW_CANCEL: 'flow:cancel',
-	FLOW_TRANSCRIPT: 'flow:transcript',
 	MEETING_SUGGEST: 'meeting:suggest',
 	MEETING_ACTIVE: 'meeting:active',
 } as const

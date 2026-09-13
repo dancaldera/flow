@@ -30,7 +30,7 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - `src/ipc.ts` — shared IPC channel names + types; safe to import from main AND renderer (pure types/constants only).
 - `swift/` — native helpers (`fn` tap, fullscreen check); prebuilt binaries are committed, `asarUnpack`ed at package time.
 - `src/main/updates.ts` — in-app updater: pure helpers (version compare, asset pick) unit-tested; `checkForUpdates()` is the tray-menu flow (public GitHub API, no token).
-- `test/` — Vitest. Tests exist for `pillWindow.ts`, `permissions-fn`, `stt`, `updates`. Pure logic only — no Electron runtime in tests.
+- `test/` — Vitest. Tests exist for `pillWindow`, `permissions`/`permissions-fn`, `stt`, `settings`, `llm`, `updates`, `focus`, `meetings`, `systemAudio`, `history` + `history-ui`, `renderer`, `onboarding` (+ `-llm`), `inserter`, and `ipc-drift` (keeps the constants duplicated into `preload.ts`/`renderer.ts` in sync with `src/ipc.ts`). Pure logic only — no Electron runtime in tests: main-process modules are exercised through `vi.mock('electron')`, renderer modules through jsdom.
 
 ## Conventions
 
