@@ -1,12 +1,9 @@
 :root {
-	--pill-height: 20px;
+	--pill-height: 16px;
 	--pill-font-size: 11px;
-	--pill-gap: 5px;
+	--pill-gap: 4px;
 	--pill-dot: 6px;
-	--pill-pad: 8px;
-	/* Text is centered inside the pill, so the room the dot takes on the left is
-	   mirrored on the right; the dot itself is out of flow. */
-	--pill-pad-inner: calc(var(--pill-pad) + var(--pill-dot) + var(--pill-gap));
+	--pill-pad: 6px;
 	--pill-green: #15803d;
 	/* One duration/easing pair drives every pill transition. */
 	--pill-anim: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -30,20 +27,19 @@ body {
 }
 
 #pill {
-	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
 	height: var(--pill-height);
-	padding: 0 var(--pill-pad-inner);
+	padding: 0 var(--pill-pad);
 	/* Black glass: the darker the tint, the less opaque it needs to be — the
 	   blur carries legibility, not the background. */
 	background: rgba(0, 0, 0, 0.5);
 	backdrop-filter: blur(24px) saturate(140%);
 	-webkit-backdrop-filter: blur(24px) saturate(140%);
 	color: #fff;
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.22);
 	border-radius: 999px;
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 	-webkit-app-region: no-drag;
@@ -54,9 +50,9 @@ body {
 
 /* Idle: a faint empty capsule that only wakes under the cursor. */
 body[data-phase="idle"] #pill {
-	min-width: 60px;
+	min-width: 40px;
 	background: rgba(0, 0, 0, 0.22);
-	border-color: rgba(255, 255, 255, 0.06);
+	border-color: rgba(255, 255, 255, 0.14);
 	box-shadow: none;
 }
 
@@ -65,9 +61,9 @@ body[data-hover="true"] #pill {
 }
 
 body[data-phase="idle"][data-hover="true"] #pill {
-	min-width: 190px;
+	min-width: 170px;
 	background: rgba(0, 0, 0, 0.62);
-	border-color: rgba(255, 255, 255, 0.18);
+	border-color: rgba(255, 255, 255, 0.34);
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
@@ -75,13 +71,13 @@ body[data-phase="idle"][data-hover="true"] #pill {
 	transform: scale(0.97);
 }
 
-/* Dot indicator: pinned in the left gutter so it never shifts the text. */
+/* Dot indicator: the first item of the centered flex group. It keeps its box
+   in every state (only opacity and scale change), so the text never shifts. */
 .dot {
-	position: absolute;
-	left: var(--pill-pad);
-	top: calc(50% - var(--pill-dot) / 2);
+	flex: none;
 	width: var(--pill-dot);
 	height: var(--pill-dot);
+	margin-right: var(--pill-gap);
 	border-radius: 50%;
 	transition: all var(--pill-anim);
 }
@@ -177,9 +173,9 @@ body[data-phase="idle"][data-hover="true"] #cta-alt {
 
 /* Meeting suggestion */
 body[data-phase="idle"][data-meeting="true"] #pill {
-	min-width: 140px;
+	min-width: 120px;
 	background: rgba(0, 0, 0, 0.55);
-	border-color: rgba(21, 128, 61, 0.55);
+	border-color: rgba(52, 199, 89, 0.6);
 }
 
 body[data-phase="idle"][data-meeting="true"] #meet {
@@ -188,7 +184,7 @@ body[data-phase="idle"][data-meeting="true"] #meet {
 }
 
 body[data-phase="idle"][data-meeting="true"][data-hover="true"] #pill {
-	min-width: 240px;
+	min-width: 210px;
 }
 
 body[data-phase="idle"][data-meeting="true"][data-hover="true"] #meet {

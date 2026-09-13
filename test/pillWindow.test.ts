@@ -42,9 +42,9 @@ describe('PILL_WINDOW_WIDTH', () => {
 	it('fits the widest pill state so centered status text is never clipped', () => {
 		// Measured offscreen at 2x from the real index.html + pill.css: the
 		// widest state is idle + hover + the meeting teaser (all three hints
-		// visible) at 401px. A narrower window squeezes the pill, and the
+		// visible) at 384px. A narrower window squeezes the pill, and the
 		// overflow-hidden hints then clip their own text.
-		expect(PILL_WINDOW_WIDTH).toBeGreaterThanOrEqual(401)
+		expect(PILL_WINDOW_WIDTH).toBeGreaterThanOrEqual(384)
 	})
 })
 
