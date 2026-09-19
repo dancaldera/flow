@@ -26,6 +26,7 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - `src/main/pillWindow.ts` — floating pill geometry (pure, unit-tested: placement, Dock/fullscreen clamp).
 - `src/main/permissions.ts`, `src/main/settings.ts` — macOS permissions, provider settings, keychain.
 - `src/services/stt.ts` — STT provider seam (`SttProvider`); adding a provider = new class, no rewrites.
+- `src/services/jev.ts` — TypeSafe Jev decision model (`TYPESAFE_API_KEY` / `OPENROUTER_API_KEY` env); routes short transcripts to macOS commands via osascript, falls back to paste.
 - `src/renderer.ts` + `index.html` + `styles/pill.css` — pill UI + mic capture. The renderer loads as a plain `<script src>` — it CANNOT import modules compiled to CJS (no `require`); keep it dependency-free or the build's strip step fails.
 - `src/ipc.ts` — shared IPC channel names + types; safe to import from main AND renderer (pure types/constants only).
 - `swift/` — native helpers (`fn` tap, fullscreen check); prebuilt binaries are committed, `asarUnpack`ed at package time.

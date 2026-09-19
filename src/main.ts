@@ -20,6 +20,7 @@ import {
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
 import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveLlmSetup, resolveProviderSetup, saveLlmSetup, saveProviderSetup, saveSettings } from './main/settings'
 import { muteSystemAudio, restoreSystemAudio, restoreSystemAudioSync } from './main/systemAudio'
+import { decideCommand, runCommand } from './services/jev'
 import { createLlmClient } from './services/llm'
 import { SttError, createSttProvider, testSttProvider } from './services/stt'
 
@@ -297,6 +298,14 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 		const provider = createSttProvider(settings)
 		const ext = audioMime.includes('wav') ? 'wav' : 'webm'
 		const text = await provider.transcribe({ audio, filename: `flow.${ext}`, mimeType: audioMime, language: settings.language || undefined })
+		const command = await decideCommand(text)
+		if (command) {
+			console.log(`[flow] command: ${command} ("${text}")`)
+			await ensurePasteTarget()
+			await runCommand(command)
+			setState({ phase: 'idle' })
+			return
+		}
 		if (historyDb && text) {
 			try {
 				recordTranscription(historyDb, { text, provider: settings.provider, source: lastStartSource })
