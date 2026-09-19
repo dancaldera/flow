@@ -1,7 +1,12 @@
 import { execFile } from 'node:child_process'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { app } from 'electron'
 import { loadJevToken } from '../main/settings'
 
-type Command = { blurb: string; script: string } // script = AppleScript run via osascript -e
+// script = AppleScript run via osascript -e; helper = committed swift binary
+// under swift/ — preferred when present, script is the fallback.
+type Command = { blurb: string; script?: string; helper?: string }
 
 function keys(combo: string): string {
 	return `tell application "System Events" to ${combo}`
@@ -9,7 +14,7 @@ function keys(combo: string): string {
 
 export const COMMANDS: Record<string, Command> = {
 	// System basics
-	lock_screen: { blurb: 'Lock the screen', script: keys('keystroke "q" using {control down, command down}') },
+	lock_screen: { blurb: 'Lock the screen', helper: 'flow-lock', script: keys('keystroke "q" using {control down, command down}') },
 	sleep: { blurb: 'Put the computer to sleep', script: 'tell application "System Events" to sleep' },
 	mute: { blurb: 'Mute audio output', script: 'set volume with output muted' },
 	unmute: { blurb: 'Unmute audio output', script: 'set volume without output muted' },
@@ -123,10 +128,20 @@ export async function testJev(token: string): Promise<{ provider: 'openrouter' |
 	return { provider: token.startsWith('sk-or-') ? 'openrouter' : 'typesafe' }
 }
 
+function helperPath(name: string): string {
+	// Same unpack rule as fnHelperPath in src/main/permissions.ts: child
+	// processes cannot execute from inside the asar archive.
+	return path.join(app.getAppPath().replace('app.asar', 'app.asar.unpacked'), 'swift', name)
+}
+
 export function runCommand(id: string): Promise<void> {
 	const command = COMMANDS[id]
 	if (!command) return Promise.resolve()
+	const helper = command.helper ? helperPath(command.helper) : ''
 	return new Promise((resolve, reject) => {
-		execFile('osascript', ['-e', command.script], (error) => (error ? reject(error) : resolve()))
+		const callback = (error: Error | null) => (error ? reject(error) : resolve())
+		if (helper && fs.existsSync(helper)) execFile(helper, [], callback)
+		else if (command.script) execFile('osascript', ['-e', command.script], callback)
+		else resolve()
 	})
 }

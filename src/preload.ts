@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('flowSetup', {
 	testLlm: (setup: { baseUrl: string; model: string; token: string }) => ipcRenderer.invoke('onboarding:test-llm', setup),
 	saveJev: (setup: { token: string }) => ipcRenderer.invoke('onboarding:save-jev', setup),
 	testJev: (setup: { token: string }) => ipcRenderer.invoke('onboarding:test-jev', setup),
+	checkAutomation: () => ipcRenderer.invoke('onboarding:check-automation'),
+	openAutomation: () => ipcRenderer.invoke('permissions:open-automation'),
 	requestMic: () => ipcRenderer.invoke('permissions:request-mic'),
 	promptAccessibility: () => ipcRenderer.invoke('permissions:prompt-accessibility'),
 	openInputMonitoring: () => ipcRenderer.invoke('permissions:open-input-monitoring'),

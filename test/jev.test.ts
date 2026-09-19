@@ -1,15 +1,21 @@
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const hoisted = vi.hoisted(() => ({ userData: '/tmp/flow-jev-test' }))
+const hoisted = vi.hoisted(() => ({
+	userData: '/tmp/flow-jev-test',
+	execFile: vi.fn((_file: string, _args: string[], cb: (error: Error | null) => void) => cb(null)),
+}))
 
 vi.mock('electron', () => ({
-	app: { getPath: () => hoisted.userData },
+	app: { getPath: () => hoisted.userData, getAppPath: () => hoisted.userData },
 	safeStorage: { isEncryptionAvailable: () => false },
 }))
 
+vi.mock('node:child_process', () => ({ execFile: hoisted.execFile }))
+
 import { isJevConfigured, jevStatus, loadJevToken, saveJevSetup } from '../src/main/settings'
-import { CHOICE_THRESHOLD, COMMANDS, COMMAND_THRESHOLD, decideCommand, jevEndpoint, pickCommand, testJev } from '../src/services/jev'
+import { CHOICE_THRESHOLD, COMMANDS, COMMAND_THRESHOLD, decideCommand, jevEndpoint, pickCommand, runCommand, testJev } from '../src/services/jev'
 
 let savedTypeSafe: string | undefined
 let savedOpenRouter: string | undefined
@@ -21,6 +27,7 @@ beforeEach(() => {
 	delete process.env.OPENROUTER_API_KEY
 	fs.rmSync(hoisted.userData, { recursive: true, force: true })
 	vi.unstubAllGlobals()
+	hoisted.execFile.mockClear()
 })
 
 afterEach(() => {
@@ -147,11 +154,25 @@ describe('jev settings', () => {
 	})
 })
 
+describe('runCommand', () => {
+	it('runs the helper binary when it exists', async () => {
+		fs.mkdirSync(path.join(hoisted.userData, 'swift'), { recursive: true })
+		fs.writeFileSync(path.join(hoisted.userData, 'swift', 'flow-lock'), 'x')
+		await runCommand('lock_screen')
+		expect(hoisted.execFile).toHaveBeenCalledWith(path.join(hoisted.userData, 'swift', 'flow-lock'), [], expect.any(Function))
+	})
+
+	it('falls back to osascript when the helper is missing', async () => {
+		await runCommand('lock_screen')
+		expect(hoisted.execFile).toHaveBeenCalledWith('osascript', ['-e', expect.stringContaining('keystroke "q"')], expect.any(Function))
+	})
+})
+
 describe('COMMANDS', () => {
-	it('every entry has a non-empty blurb and script', () => {
+	it('every entry has a non-empty blurb and a script or helper', () => {
 		for (const command of Object.values(COMMANDS)) {
 			expect(command.blurb.length).toBeGreaterThan(0)
-			expect(command.script.length).toBeGreaterThan(0)
+			expect(Boolean(command.script || command.helper)).toBe(true)
 		}
 	})
 })

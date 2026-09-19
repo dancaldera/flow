@@ -18,7 +18,7 @@ vi.mock('electron', () => ({
 	},
 }))
 
-import { accessibilityStatus, allGranted, microphoneStatus, report } from '../src/main/permissions'
+import { accessibilityStatus, allGranted, automationDenial, microphoneStatus, report } from '../src/main/permissions'
 
 /** An executable stand-in for the fn helper whose --check exits `code`. */
 function fakeHelper(code: number): void {
@@ -107,5 +107,20 @@ describe('allGranted', () => {
 		expect(allGranted({ microphone: 'missing', accessibility: 'granted' })).toBe(false)
 		expect(allGranted({ microphone: 'granted', accessibility: 'missing' })).toBe(false)
 		expect(allGranted({ microphone: 'unknown', accessibility: 'unknown' })).toBe(false)
+	})
+})
+
+describe('automationDenial', () => {
+	it('parses the target from a -1743 denial', () => {
+		expect(automationDenial('144:148: execution error: Not authorized to send Apple events to System Events. (-1743)')).toBe('System Events')
+	})
+
+	it('falls back to a known target mentioned in the message', () => {
+		expect(automationDenial('Finder got an error: User canceled. (-1743)')).toBe('Finder')
+	})
+
+	it('returns null for unrelated errors', () => {
+		expect(automationDenial('osascript: no such file')).toBeNull()
+		expect(automationDenial('')).toBeNull()
 	})
 })

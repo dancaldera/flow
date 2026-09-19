@@ -6,7 +6,8 @@ type Provider = { id: string; label: string; defaultModel: string; models: Provi
 type Setup = { provider: string; model: string; language: string; configured: boolean }
 type LlmState = { baseUrl: string; model: string; configured: boolean }
 type JevState = { configured: boolean; provider: 'openrouter' | 'typesafe' | null }
-type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState; jev: JevState }
+type AutomationState = Partial<Record<'System Events' | 'Finder', PermissionState>>
+type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState; jev: JevState; automation: AutomationState }
 
 const DEFAULT_AX_HINT = 'Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.'
 
@@ -20,6 +21,8 @@ declare global {
 			testLlm: (setup: { baseUrl: string; model: string; token: string }) => Promise<{ model: string }>
 			saveJev: (setup: { token: string }) => Promise<JevState>
 			testJev: (setup: { token: string }) => Promise<{ provider: 'openrouter' | 'typesafe' }>
+			checkAutomation: () => Promise<AutomationState>
+			openAutomation: () => Promise<void>
 			requestMic: () => Promise<boolean>
 			promptAccessibility: () => Promise<void>
 			openInputMonitoring: () => Promise<void>
@@ -55,6 +58,16 @@ const jevToken = document.getElementById('jev-token') as HTMLInputElement
 const jevStatus = document.getElementById('jev-status') as HTMLDivElement
 const btnTestJev = document.getElementById('btn-test-jev') as HTMLButtonElement
 const jevTestStatus = document.getElementById('jev-test-status') as HTMLSpanElement
+const jevReady = document.getElementById('jev-ready') as HTMLDivElement
+const dotJevKey = document.getElementById('dot-jev-key') as HTMLSpanElement
+const dotJevAx = document.getElementById('dot-jev-ax') as HTMLSpanElement
+const dotJevSe = document.getElementById('dot-jev-se') as HTMLSpanElement
+const txtJevSe = document.getElementById('txt-jev-se') as HTMLSpanElement
+const dotJevFinder = document.getElementById('dot-jev-finder') as HTMLSpanElement
+const txtJevFinder = document.getElementById('txt-jev-finder') as HTMLSpanElement
+const btnCheckAutomation = document.getElementById('btn-check-automation') as HTMLButtonElement
+const btnOpenAutomation = document.getElementById('btn-open-automation') as HTMLButtonElement
+const jevReadyStatus = document.getElementById('jev-ready-status') as HTMLSpanElement
 const error = document.getElementById('error') as HTMLDivElement
 const dotMic = document.getElementById('dot-mic') as HTMLSpanElement
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement
@@ -236,9 +249,16 @@ function renderLlm(): void {
 	}
 }
 
+function automationText(target: 'System Events' | 'Finder'): string {
+	const status = state?.automation[target] ?? 'unknown'
+	const suffix = status === 'granted' ? 'allowed' : status === 'missing' ? 'blocked — enable Flow in Automation Settings' : 'not checked yet'
+	return `Automation: ${target} — ${suffix}`
+}
+
 function renderJev(): void {
 	if (!state) return
 	jevStatus.classList.toggle('saved', state.jev.configured)
+	jevReady.classList.toggle('hidden', !state.jev.configured)
 	if (state.jev.configured) {
 		jevStatus.textContent = `✓ Jev key saved (${state.jev.provider}). Leave empty to keep it — a new key replaces it.`
 		jevToken.placeholder = 'Saved •••••• — enter a new key to replace'
@@ -246,6 +266,12 @@ function renderJev(): void {
 		jevStatus.textContent = 'Optional: no Jev key saved — say "mute", "undo", "open terminal" once you add one (sk-or-… keys go via OpenRouter).'
 		jevToken.placeholder = ''
 	}
+	dotJevKey.className = `dot ${state.jev.configured ? 'granted' : 'missing'}`
+	dotJevAx.className = `dot ${state.permissions.accessibility}`
+	dotJevSe.className = `dot ${state.automation['System Events'] ?? 'unknown'}`
+	dotJevFinder.className = `dot ${state.automation.Finder ?? 'unknown'}`
+	txtJevSe.textContent = automationText('System Events')
+	txtJevFinder.textContent = automationText('Finder')
 }
 
 function testStatus(element: HTMLSpanElement, message: string, kind = ''): void {
@@ -309,6 +335,21 @@ async function testJev(): Promise<void> {
 	} finally {
 		btnTestJev.disabled = false
 	}
+}
+
+async function checkAutomationAccess(): Promise<void> {
+	btnCheckAutomation.disabled = true
+	testStatus(jevReadyStatus, 'Checking… (allow the macOS prompts)')
+	try {
+		const result = await window.flowSetup.checkAutomation()
+		const ok = result['System Events'] === 'granted' && result.Finder === 'granted'
+		testStatus(jevReadyStatus, ok ? '✓ All set' : 'Some access is still missing — see above.', ok ? 'ok' : 'fail')
+	} catch (cause) {
+		testStatus(jevReadyStatus, cause instanceof Error ? cause.message : 'Could not check Automation access.', 'fail')
+	} finally {
+		btnCheckAutomation.disabled = false
+	}
+	await refresh()
 }
 
 function showPermissions(): void {
@@ -391,6 +432,8 @@ jevToken.oninput = clearJevTest
 btnTestStt.onclick = () => void testStt()
 btnTestLlm.onclick = () => void testLlm()
 btnTestJev.onclick = () => void testJev()
+btnCheckAutomation.onclick = () => void checkAutomationAccess()
+btnOpenAutomation.onclick = () => void window.flowSetup.openAutomation()
 btnSave.onclick = () =>
 	void (async () => {
 		error.textContent = ''

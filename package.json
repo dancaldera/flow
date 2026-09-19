@@ -6,7 +6,8 @@
     "asarUnpack": [
       "swift/flow-fn-listener",
       "swift/flow-fullscreen-check",
-      "swift/flow-frontmost"
+      "swift/flow-frontmost",
+      "swift/flow-lock"
     ],
     "directories": {
       "output": "release/"
@@ -20,7 +21,8 @@
       "styles/**/*",
       "swift/flow-fn-listener",
       "swift/flow-fullscreen-check",
-      "swift/flow-frontmost"
+      "swift/flow-frontmost",
+      "swift/flow-lock"
     ],
     "mac": {
       "identity": "Flow",

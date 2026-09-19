@@ -62,6 +62,7 @@ Each model offers only the languages its API accepts — the picker shows Auto-d
 ```bash
 swiftc -o swift/flow-fn-listener swift/fn-listener.swift -framework Cocoa
 swiftc -o swift/flow-fullscreen-check swift/fullscreen-check.swift -framework Cocoa
+swiftc -O -o swift/flow-lock swift/lock.swift
 npm start   # main auto-detects ./swift/flow-fn-listener
 ```
 

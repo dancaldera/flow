@@ -44,6 +44,7 @@ function freshState() {
 		configuredProviders: ['openai'],
 		llm: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', configured: false },
 		jev: { configured: false, provider: null },
+		automation: {},
 	}
 }
 
@@ -60,6 +61,7 @@ function loadOnboarding(): Promise<void> {
 		'<input id="token" /><div id="key-status"></div><button id="btn-test-stt"></button><span id="stt-test-status"></span>' +
 		'<input id="llm-base-url" /><input id="llm-model" /><input id="llm-token" /><div id="llm-status"></div><button id="btn-test-llm"></button><span id="llm-test-status"></span>' +
 		'<input id="jev-token" /><div id="jev-status"></div><button id="btn-test-jev"></button><span id="jev-test-status"></span>' +
+		'<div id="jev-ready" class="hidden"><span id="dot-jev-key"></span><span id="dot-jev-ax"></span><span id="dot-jev-se"></span><span id="txt-jev-se"></span><span id="dot-jev-finder"></span><span id="txt-jev-finder"></span><button id="btn-check-automation"></button><button id="btn-open-automation"></button><span id="jev-ready-status"></span></div>' +
 		'<div id="error"></div><button id="btn-save">Continue</button>' +
 		'</section>' +
 		'<section id="permissions-step" class="hidden">' +
@@ -85,6 +87,8 @@ function loadOnboarding(): Promise<void> {
 			return Promise.resolve(stateFixture.jev)
 		},
 		testJev: () => Promise.resolve({ provider: 'typesafe' }),
+		checkAutomation: () => Promise.resolve(stateFixture.automation),
+		openAutomation: () => Promise.resolve(),
 		requestMic: () => Promise.resolve(true),
 		promptAccessibility: () => Promise.resolve(),
 		openInputMonitoring: () => Promise.resolve(),

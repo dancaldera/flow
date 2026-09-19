@@ -60,6 +60,34 @@ export function openInputMonitoringSettings(): void {
 	void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent')
 }
 
+export type AutomationTarget = 'System Events' | 'Finder'
+export const AUTOMATION_TARGETS: AutomationTarget[] = ['System Events', 'Finder']
+
+/** Pure. -1743 → target name parsed from the message, else the first known target mentioned. */
+export function automationDenial(message: string): string | null {
+	if (!message.includes('-1743') && !message.includes('Not authorized to send Apple events')) return null
+	const match = message.match(/to ([A-Z][^.]*?)\./)
+	if (match) return match[1]
+	return AUTOMATION_TARGETS.find((candidate) => message.includes(candidate)) ?? 'System Events'
+}
+
+/** Probes one target — this also triggers the macOS consent prompt when undetermined. */
+export async function probeAutomation(target: AutomationTarget): Promise<PermissionState> {
+	try {
+		await new Promise<void>((resolve, reject) => {
+			execFile('osascript', ['-e', `tell application "${target}" to get name`], (error) => (error ? reject(error) : resolve()))
+		})
+		return 'granted'
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+		return automationDenial(message) ? 'missing' : 'unknown'
+	}
+}
+
+export function openAutomationSettings(): void {
+	void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation')
+}
+
 export function fnHelperPath(): string {
 	// Same unpack rule as fullscreenCheckPath in main.ts: child processes cannot
 	// execute from inside the asar archive.

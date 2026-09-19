@@ -10,12 +10,18 @@ import { insertTextAtCursor } from './main/inserter'
 import { formatTimestamp, isMeetingApp } from './main/meetings'
 import { checkForUpdates } from './main/updates'
 import {
+	AUTOMATION_TARGETS,
 	allGranted,
+	automationDenial,
 	fnHelperPath,
+	openAutomationSettings,
 	openInputMonitoringSettings,
 	promptAccessibility,
+	probeAutomation,
 	report,
 	requestMicrophone,
+	type AutomationTarget,
+	type PermissionState,
 } from './main/permissions'
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
 import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, jevStatus, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveJevToken, resolveLlmSetup, resolveProviderSetup, saveJevSetup, saveLlmSetup, saveProviderSetup, saveSettings } from './main/settings'
@@ -109,6 +115,16 @@ function buildTrayMenu(): Menu {
 let historyWin: BrowserWindow | null = null
 let historyDb: DatabaseSync | null = null
 let lastStartSource = ''
+let automation: Partial<Record<AutomationTarget, PermissionState>> = {}
+
+// osascript `tell application X` needs a per-target TCC Automation grant; each
+// probe doubles as the consent prompt when the grant is undetermined.
+async function checkAutomation(): Promise<Partial<Record<AutomationTarget, PermissionState>>> {
+	for (const target of AUTOMATION_TARGETS) {
+		automation[target] = await probeAutomation(target)
+	}
+	return automation
+}
 
 function openHistoryWindow(): void {
 	if (historyWin && !historyWin.isDestroyed()) {
@@ -302,8 +318,19 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 		if (command) {
 			console.log(`[flow] command: ${command} ("${text}")`)
 			await ensurePasteTarget()
-			await runCommand(command)
-			setState({ phase: 'idle' })
+			try {
+				await runCommand(command)
+				setState({ phase: 'idle' })
+			} catch (error) {
+				const msg = error instanceof Error ? error.message : String(error)
+				const denied = automationDenial(msg)
+				if (denied) {
+					automation[denied as AutomationTarget] = 'missing'
+					setState({ phase: 'error', message: `Flow can't control ${denied} yet — open Setup → Voice commands and grant access.` })
+				} else {
+					setState({ phase: 'error', message: `Command failed: ${msg}` })
+				}
+			}
 			return
 		}
 		if (historyDb && text) {
@@ -672,12 +699,21 @@ export async function boot(): Promise<void> {
 			configuredProviders: STT_PROVIDERS.filter((id) => Boolean(loadProviderToken(id))),
 			llm: llmStatus(),
 			jev: jevStatus(),
+			automation,
 		}
 	})
 	ipcMain.handle('onboarding:save-setup', (_event, setup) => saveProviderSetup(setup))
 	ipcMain.handle('onboarding:save-llm', (_event, setup) => saveLlmSetup(setup))
-	ipcMain.handle('onboarding:save-jev', (_event, setup) => saveJevSetup(setup))
+	ipcMain.handle('onboarding:save-jev', async (_event, setup) => {
+		const status = saveJevSetup(setup)
+		// A fresh key turns voice commands on — probe Automation targets now so
+		// the macOS consent prompts appear while the user is in the setup flow.
+		const token = (setup as { token?: unknown })?.token
+		if (typeof token === 'string' && token.trim()) void checkAutomation()
+		return status
+	})
 	ipcMain.handle('onboarding:test-jev', async (_event, setup) => testJev(resolveJevToken(setup)))
+	ipcMain.handle('onboarding:check-automation', () => checkAutomation())
 	ipcMain.handle('onboarding:test-stt', async (_event, setup) => {
 		const resolved = resolveProviderSetup(setup)
 		await testSttProvider(createSttProvider(resolved.settings, resolved.token), resolved.settings.language || undefined)
@@ -703,6 +739,7 @@ export async function boot(): Promise<void> {
 		app.exit(0)
 	})
 	ipcMain.handle('permissions:open-input-monitoring', () => openInputMonitoringSettings())
+	ipcMain.handle('permissions:open-automation', () => openAutomationSettings())
 	ipcMain.handle('onboarding:complete', async () => {
 		await startFlowIfReady()
 		return flowStarted
