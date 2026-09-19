@@ -27,13 +27,18 @@ function fakeHelper(code: number): void {
 	fs.writeFileSync(path.join(dir, 'flow-fn-listener'), `#!/bin/sh\nexit ${code}\n`, { mode: 0o755 })
 }
 
+// The status checks short-circuit to 'granted' off macOS; CI runs on Linux.
+const realPlatform = process.platform
+
 beforeEach(() => {
+	Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
 	hoisted.mediaStatus = 'granted'
 	hoisted.axTrusted = true
 	fs.rmSync(hoisted.userData, { recursive: true, force: true })
 })
 
 afterEach(() => {
+	Object.defineProperty(process, 'platform', { value: realPlatform, configurable: true })
 	vi.mocked(systemPreferences.getMediaAccessStatus).mockImplementation(() => hoisted.mediaStatus)
 	vi.mocked(systemPreferences.isTrustedAccessibilityClient).mockImplementation(() => hoisted.axTrusted)
 	fs.rmSync(hoisted.userData, { recursive: true, force: true })
