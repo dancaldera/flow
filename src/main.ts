@@ -18,9 +18,9 @@ import {
 	requestMicrophone,
 } from './main/permissions'
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
-import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveLlmSetup, resolveProviderSetup, saveLlmSetup, saveProviderSetup, saveSettings } from './main/settings'
+import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, jevStatus, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveJevToken, resolveLlmSetup, resolveProviderSetup, saveJevSetup, saveLlmSetup, saveProviderSetup, saveSettings } from './main/settings'
 import { muteSystemAudio, restoreSystemAudio, restoreSystemAudioSync } from './main/systemAudio'
-import { decideCommand, runCommand } from './services/jev'
+import { decideCommand, runCommand, testJev } from './services/jev'
 import { createLlmClient } from './services/llm'
 import { SttError, createSttProvider, testSttProvider } from './services/stt'
 
@@ -671,10 +671,13 @@ export async function boot(): Promise<void> {
 			providers: Object.entries(PROVIDERS).map(([id, definition]) => ({ id, ...definition })),
 			configuredProviders: STT_PROVIDERS.filter((id) => Boolean(loadProviderToken(id))),
 			llm: llmStatus(),
+			jev: jevStatus(),
 		}
 	})
 	ipcMain.handle('onboarding:save-setup', (_event, setup) => saveProviderSetup(setup))
 	ipcMain.handle('onboarding:save-llm', (_event, setup) => saveLlmSetup(setup))
+	ipcMain.handle('onboarding:save-jev', (_event, setup) => saveJevSetup(setup))
+	ipcMain.handle('onboarding:test-jev', async (_event, setup) => testJev(resolveJevToken(setup)))
 	ipcMain.handle('onboarding:test-stt', async (_event, setup) => {
 		const resolved = resolveProviderSetup(setup)
 		await testSttProvider(createSttProvider(resolved.settings, resolved.token), resolved.settings.language || undefined)

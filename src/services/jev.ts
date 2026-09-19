@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { loadJevToken } from '../main/settings'
 
 type Command = { blurb: string; script: string } // script = AppleScript run via osascript -e
 
@@ -58,10 +59,32 @@ export function jevEndpoint(key: string): { url: string; model: string } {
 }
 
 export function jevKey(): string {
-	return process.env.TYPESAFE_API_KEY || process.env.OPENROUTER_API_KEY || ''
+	return loadJevToken()
 }
 
 const MAX_COMMAND_CHARS = 200
+
+async function askJev(key: string, state: string, questions: Record<string, object>): Promise<JevAnswers> {
+	const { url, model } = jevEndpoint(key)
+	let response: Response
+	try {
+		response = await fetch(url, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ model, state, questions }),
+			signal: AbortSignal.timeout(4000),
+		})
+	} catch (error) {
+		throw new Error(`Jev unreachable: ${error instanceof Error ? error.message : String(error)}`)
+	}
+	const data = (await response.json().catch(() => ({}))) as { answers?: JevAnswers; error?: { message?: string } | string; message?: string }
+	if (response.status === 401 || response.status === 403) throw new Error('Jev authentication failed.')
+	if (!response.ok) {
+		const message = typeof data.error === 'string' ? data.error : (data.error?.message ?? data.message ?? response.statusText)
+		throw new Error(`Jev ${response.status}: ${message}`)
+	}
+	return data.answers ?? {}
+}
 
 /** Null when no key, on any error, or when Jev says it's dictation. Never throws. */
 export async function decideCommand(transcript: string): Promise<string | null> {
@@ -69,42 +92,35 @@ export async function decideCommand(transcript: string): Promise<string | null> 
 		const key = jevKey()
 		const text = transcript.trim()
 		if (!key || !text || text.length > MAX_COMMAND_CHARS) return null
-		const { url, model } = jevEndpoint(key)
-		const response = await fetch(url, {
-			method: 'POST',
-			headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				model,
-				state: text,
-				questions: {
-					is_command: {
-						type: 'noul',
-						instructions:
-							'The user is dictating into a computer. Is this a short spoken command telling the computer to do something right now (like "mute", "undo", "new line", "open terminal"), rather than words they want typed out as text?',
-						criteria: {
-							true: 'A brief imperative voice command aimed at the computer itself, including editing shortcuts such as new line, delete word, select all',
-							false: 'A sentence, message, note or any prose meant to be typed, even if it mentions actions like copying, undoing or opening',
-						},
-					},
-					command: {
-						type: 'choice',
-						instructions: 'Which action does the user want?',
-						criteria: CHOICE_CRITERIA,
-					},
+		const answers = await askJev(key, text, {
+			is_command: {
+				type: 'noul',
+				instructions:
+					'The user is dictating into a computer. Is this a short spoken command telling the computer to do something right now (like "mute", "undo", "new line", "open terminal"), rather than words they want typed out as text?',
+				criteria: {
+					true: 'A brief imperative voice command aimed at the computer itself, including editing shortcuts such as new line, delete word, select all',
+					false: 'A sentence, message, note or any prose meant to be typed, even if it mentions actions like copying, undoing or opening',
 				},
-			}),
-			signal: AbortSignal.timeout(4000),
+			},
+			command: {
+				type: 'choice',
+				instructions: 'Which action does the user want?',
+				criteria: CHOICE_CRITERIA,
+			},
 		})
-		const data = (await response.json().catch(() => ({}))) as { answers?: JevAnswers }
-		if (!response.ok) {
-			console.log(`[flow] jev ${response.status}`)
-			return null
-		}
-		return pickCommand(data.answers ?? {})
+		return pickCommand(answers)
 	} catch (error) {
 		console.log(`[flow] jev failed: ${error instanceof Error ? error.message : error}`)
 		return null
 	}
+}
+
+export async function testJev(token: string): Promise<{ provider: 'openrouter' | 'typesafe' }> {
+	const answers = await askJev(token, 'mute', {
+		is_command: { type: 'noul', instructions: 'Is this a command?' },
+	})
+	if (typeof answers.is_command?.noul !== 'number') throw new Error('Jev returned no decision.')
+	return { provider: token.startsWith('sk-or-') ? 'openrouter' : 'typesafe' }
 }
 
 export function runCommand(id: string): Promise<void> {

@@ -437,24 +437,81 @@ function llmTokenPath(): string {
 	return path.join(app.getPath('userData'), 'llm-token.bin')
 }
 
-export function saveLlmToken(token: string): void {
-	fs.mkdirSync(path.dirname(llmTokenPath()), { recursive: true })
+function jevTokenPath(): string {
+	return path.join(app.getPath('userData'), 'jev-token.bin')
+}
+
+function saveTokenFile(tokenFile: string, token: string): void {
+	fs.mkdirSync(path.dirname(tokenFile), { recursive: true })
 	if (safeStorage.isEncryptionAvailable()) {
-		fs.writeFileSync(llmTokenPath(), safeStorage.encryptString(token))
+		fs.writeFileSync(tokenFile, safeStorage.encryptString(token))
 	} else {
-		fs.writeFileSync(llmTokenPath(), Buffer.from(`plain:${token}`))
+		fs.writeFileSync(tokenFile, Buffer.from(`plain:${token}`))
 	}
 }
 
-export function loadLlmToken(): string {
+function loadTokenFile(tokenFile: string, environmentFallback: string): string {
 	try {
-		const buf = fs.readFileSync(llmTokenPath())
+		const buf = fs.readFileSync(tokenFile)
 		if (safeStorage.isEncryptionAvailable()) return safeStorage.decryptString(buf)
 		const s = buf.toString('utf8')
 		return s.startsWith('plain:') ? s.slice(6) : ''
 	} catch {
-		return process.env.LLM_API_KEY ?? ''
+		return environmentFallback
 	}
+}
+
+export function saveLlmToken(token: string): void {
+	saveTokenFile(llmTokenPath(), token)
+}
+
+export function loadLlmToken(): string {
+	return loadTokenFile(llmTokenPath(), process.env.LLM_API_KEY ?? '')
+}
+
+export interface JevStatus {
+	configured: boolean
+	provider: 'openrouter' | 'typesafe' | null
+}
+
+export function saveJevToken(token: string): void {
+	saveTokenFile(jevTokenPath(), token)
+}
+
+export function loadJevToken(): string {
+	return loadTokenFile(jevTokenPath(), process.env.TYPESAFE_API_KEY || process.env.OPENROUTER_API_KEY || '')
+}
+
+export function isJevConfigured(): boolean {
+	return Boolean(loadJevToken())
+}
+
+export function jevStatus(): JevStatus {
+	const token = loadJevToken()
+	// The endpoint is inferred from the key shape — same prefix check as
+	// jevEndpoint in src/services/jev.ts.
+	return {
+		configured: Boolean(token),
+		provider: !token ? null : token.startsWith('sk-or-') ? 'openrouter' : 'typesafe',
+	}
+}
+
+/** The submitted key, or the saved one when the field is left empty. */
+export function resolveJevToken(setup: unknown): string {
+	const candidate = setup as { token?: unknown } | null
+	const token = typeof candidate?.token === 'string' ? candidate.token.trim() : ''
+	if (token) return token
+	const saved = loadJevToken()
+	if (saved) return saved
+	throw new Error('A TypeSafe or OpenRouter API key is required.')
+}
+
+export function saveJevSetup(setup: unknown): JevStatus {
+	resolveJevToken(setup)
+	const candidate = setup as { token?: unknown } | null
+	const newToken = typeof candidate?.token === 'string' ? candidate.token.trim() : ''
+	if (newToken) saveJevToken(newToken)
+	return jevStatus()
 }
 
 export function loadProviderToken(provider: SttProviderId): string {

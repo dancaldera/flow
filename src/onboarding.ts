@@ -5,7 +5,8 @@ type ProviderModel = { id: string; label: string; blurb: string; languages: stri
 type Provider = { id: string; label: string; defaultModel: string; models: ProviderModel[]; needsAccountId: boolean; needsGatewayId: boolean }
 type Setup = { provider: string; model: string; language: string; configured: boolean }
 type LlmState = { baseUrl: string; model: string; configured: boolean }
-type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState }
+type JevState = { configured: boolean; provider: 'openrouter' | 'typesafe' | null }
+type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState; jev: JevState }
 
 const DEFAULT_AX_HINT = 'Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.'
 
@@ -17,6 +18,8 @@ declare global {
 			saveLlm: (setup: { baseUrl: string; model: string; token: string }) => Promise<LlmState>
 			testStt: (setup: { provider: string; accountId: string; gatewayId: string; model: string; language: string; token: string }) => Promise<{ provider: string; model: string }>
 			testLlm: (setup: { baseUrl: string; model: string; token: string }) => Promise<{ model: string }>
+			saveJev: (setup: { token: string }) => Promise<JevState>
+			testJev: (setup: { token: string }) => Promise<{ provider: 'openrouter' | 'typesafe' }>
 			requestMic: () => Promise<boolean>
 			promptAccessibility: () => Promise<void>
 			openInputMonitoring: () => Promise<void>
@@ -48,6 +51,10 @@ const llmToken = document.getElementById('llm-token') as HTMLInputElement
 const llmStatus = document.getElementById('llm-status') as HTMLDivElement
 const btnTestLlm = document.getElementById('btn-test-llm') as HTMLButtonElement
 const llmTestStatus = document.getElementById('llm-test-status') as HTMLSpanElement
+const jevToken = document.getElementById('jev-token') as HTMLInputElement
+const jevStatus = document.getElementById('jev-status') as HTMLDivElement
+const btnTestJev = document.getElementById('btn-test-jev') as HTMLButtonElement
+const jevTestStatus = document.getElementById('jev-test-status') as HTMLSpanElement
 const error = document.getElementById('error') as HTMLDivElement
 const dotMic = document.getElementById('dot-mic') as HTMLSpanElement
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement
@@ -229,6 +236,18 @@ function renderLlm(): void {
 	}
 }
 
+function renderJev(): void {
+	if (!state) return
+	jevStatus.classList.toggle('saved', state.jev.configured)
+	if (state.jev.configured) {
+		jevStatus.textContent = `✓ Jev key saved (${state.jev.provider}). Leave empty to keep it — a new key replaces it.`
+		jevToken.placeholder = 'Saved •••••• — enter a new key to replace'
+	} else {
+		jevStatus.textContent = 'Optional: no Jev key saved — say "mute", "undo", "open terminal" once you add one (sk-or-… keys go via OpenRouter).'
+		jevToken.placeholder = ''
+	}
+}
+
 function testStatus(element: HTMLSpanElement, message: string, kind = ''): void {
 	element.textContent = message
 	element.className = `test-status ${kind}`.trim()
@@ -240,6 +259,10 @@ function clearSttTest(): void {
 
 function clearLlmTest(): void {
 	testStatus(llmTestStatus, '')
+}
+
+function clearJevTest(): void {
+	testStatus(jevTestStatus, '')
 }
 
 async function testStt(): Promise<void> {
@@ -272,6 +295,19 @@ async function testLlm(): Promise<void> {
 		testStatus(llmTestStatus, cause instanceof Error ? cause.message : 'Could not test LLM.', 'fail')
 	} finally {
 		btnTestLlm.disabled = false
+	}
+}
+
+async function testJev(): Promise<void> {
+	btnTestJev.disabled = true
+	testStatus(jevTestStatus, 'Testing…')
+	try {
+		const result = await window.flowSetup.testJev({ token: jevToken.value })
+		testStatus(jevTestStatus, `✓ Jev responded via ${result.provider}.`, 'ok')
+	} catch (cause) {
+		testStatus(jevTestStatus, cause instanceof Error ? cause.message : 'Could not test Jev.', 'fail')
+	} finally {
+		btnTestJev.disabled = false
 	}
 }
 
@@ -316,6 +352,7 @@ async function refresh(): Promise<void> {
 		renderProvider()
 	}
 	renderLlm()
+	renderJev()
 	dotMic.className = `dot ${state.permissions.microphone}`
 	dotAx.className = `dot ${state.permissions.accessibility}`
 	dotIm.className = `dot ${state.permissions.inputMonitoring ?? 'unknown'}`
@@ -350,8 +387,10 @@ gatewayId.oninput = clearSttTest
 llmBaseUrl.oninput = clearLlmTest
 llmModel.oninput = clearLlmTest
 llmToken.oninput = clearLlmTest
+jevToken.oninput = clearJevTest
 btnTestStt.onclick = () => void testStt()
 btnTestLlm.onclick = () => void testLlm()
+btnTestJev.onclick = () => void testJev()
 btnSave.onclick = () =>
 	void (async () => {
 		error.textContent = ''
@@ -364,6 +403,10 @@ btnSave.onclick = () =>
 			if (llmToken.value.trim() !== '' || state?.llm.configured) {
 				await window.flowSetup.saveLlm({ baseUrl: llmBaseUrl.value, model: llmModel.value, token: llmToken.value })
 				llmToken.value = ''
+			}
+			if (jevToken.value.trim() !== '' || state?.jev.configured) {
+				await window.flowSetup.saveJev({ token: jevToken.value })
+				jevToken.value = ''
 			}
 			await refresh()
 			showPermissions()

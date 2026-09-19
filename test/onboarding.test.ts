@@ -43,6 +43,7 @@ function freshState() {
 		providers: PROVIDERS,
 		configuredProviders: ['openai'],
 		llm: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', configured: false },
+		jev: { configured: false, provider: null },
 	}
 }
 
@@ -58,6 +59,7 @@ function loadOnboarding(): Promise<void> {
 		'<div id="cloudflare-fields"><input id="account-id" /><input id="gateway-id" /></div>' +
 		'<input id="token" /><div id="key-status"></div><button id="btn-test-stt"></button><span id="stt-test-status"></span>' +
 		'<input id="llm-base-url" /><input id="llm-model" /><input id="llm-token" /><div id="llm-status"></div><button id="btn-test-llm"></button><span id="llm-test-status"></span>' +
+		'<input id="jev-token" /><div id="jev-status"></div><button id="btn-test-jev"></button><span id="jev-test-status"></span>' +
 		'<div id="error"></div><button id="btn-save">Continue</button>' +
 		'</section>' +
 		'<section id="permissions-step" class="hidden">' +
@@ -78,6 +80,11 @@ function loadOnboarding(): Promise<void> {
 		},
 		testStt: () => Promise.resolve({ provider: 'openai', model: 'whisper-1' }),
 		testLlm: () => Promise.resolve({ model: 'gpt-4o-mini' }),
+		saveJev: (setup: unknown) => {
+			calls.push({ method: 'saveJev', arg: setup })
+			return Promise.resolve(stateFixture.jev)
+		},
+		testJev: () => Promise.resolve({ provider: 'typesafe' }),
 		requestMic: () => Promise.resolve(true),
 		promptAccessibility: () => Promise.resolve(),
 		openInputMonitoring: () => Promise.resolve(),

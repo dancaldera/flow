@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls: Array<{ method: string; arg?: unknown }> = []
 let llmState = { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', configured: false }
+let jevState: { configured: boolean; provider: 'openrouter' | 'typesafe' | null } = { configured: false, provider: null }
 let saveLlmError: string | null = null
 
 function loadOnboarding(): Promise<void> {
@@ -15,6 +16,7 @@ function loadOnboarding(): Promise<void> {
 		'<div id="cloudflare-fields"><input id="account-id" /><input id="gateway-id" /></div>' +
 		'<input id="token" /><div id="key-status"></div><button id="btn-test-stt"></button><span id="stt-test-status"></span>' +
 		'<input id="llm-base-url" /><input id="llm-model" /><input id="llm-token" /><div id="llm-status"></div><button id="btn-test-llm"></button><span id="llm-test-status"></span>' +
+		'<input id="jev-token" /><div id="jev-status"></div><button id="btn-test-jev"></button><span id="jev-test-status"></span>' +
 		'<div id="error"></div><button id="btn-save">Continue</button>' +
 		'</section>' +
 		'<section id="permissions-step" class="hidden">' +
@@ -31,6 +33,7 @@ function loadOnboarding(): Promise<void> {
 				providers: [{ id: 'openai', label: 'OpenAI', defaultModel: 'whisper-1', models: [], needsAccountId: false, needsGatewayId: false }],
 				configuredProviders: ['openai'],
 				llm: llmState,
+			jev: jevState,
 			}),
 		save: (setup: unknown) => {
 			calls.push({ method: 'save', arg: setup })
@@ -49,6 +52,15 @@ function loadOnboarding(): Promise<void> {
 		testLlm: (setup: unknown) => {
 			calls.push({ method: 'testLlm', arg: setup })
 			return Promise.resolve({ model: (setup as { model: string }).model })
+		},
+		saveJev: (setup: unknown) => {
+			calls.push({ method: 'saveJev', arg: setup })
+			jevState = { configured: true, provider: 'typesafe' }
+			return Promise.resolve(jevState)
+		},
+		testJev: (setup: unknown) => {
+			calls.push({ method: 'testJev', arg: setup })
+			return Promise.resolve({ provider: 'typesafe' })
 		},
 		requestMic: () => Promise.resolve(true),
 		promptAccessibility: () => Promise.resolve(),
@@ -73,6 +85,7 @@ beforeEach(async () => {
 	calls.length = 0
 	saveLlmError = null
 	llmState = { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', configured: false }
+	jevState = { configured: false, provider: null }
 	await loadOnboarding()
 	await vi.waitFor(() => expect((document.getElementById('provider') as HTMLSelectElement).options.length).toBeGreaterThan(0))
 })
@@ -137,5 +150,33 @@ describe('onboarding llm section', () => {
 		}))
 		expect(calls.map((c) => c.method)).not.toContain('save')
 		expect(el('stt-test-status').textContent).toMatch(/accepted/i)
+	})
+})
+
+describe('onboarding jev section', () => {
+	it('shows the unconfigured hint when no jev key is saved', () => {
+		expect(el('jev-status').textContent).toMatch(/no jev key/i)
+	})
+
+	it('saves the jev key alongside the provider setup', async () => {
+		input('jev-token').value = 'jev-secret'
+		;(el('btn-save') as HTMLButtonElement).click()
+		await vi.waitFor(() => expect(calls).toContainEqual({ method: 'saveJev', arg: { token: 'jev-secret' } }))
+		expect(el('setup-step').classList.contains('hidden')).toBe(true)
+	})
+
+	it('skips the jev save when untouched', async () => {
+		;(el('btn-save') as HTMLButtonElement).click()
+		await vi.waitFor(() => expect(calls).toContainEqual({ method: 'save', arg: expect.anything() }))
+		await vi.advanceTimersByTimeAsync(100)
+		expect(calls.map((c) => c.method)).not.toContain('saveJev')
+	})
+
+	it('tests the jev key without saving it', async () => {
+		input('jev-token').value = 'jev-secret'
+		;(el('btn-test-jev') as HTMLButtonElement).click()
+		await vi.waitFor(() => expect(calls).toContainEqual({ method: 'testJev', arg: { token: 'jev-secret' } }))
+		expect(calls.map((c) => c.method)).not.toContain('saveJev')
+		expect(el('jev-test-status').textContent).toMatch(/responded/i)
 	})
 })

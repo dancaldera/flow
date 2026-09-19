@@ -1,5 +1,15 @@
+import * as fs from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CHOICE_THRESHOLD, COMMANDS, COMMAND_THRESHOLD, decideCommand, jevEndpoint, pickCommand } from '../src/services/jev'
+
+const hoisted = vi.hoisted(() => ({ userData: '/tmp/flow-jev-test' }))
+
+vi.mock('electron', () => ({
+	app: { getPath: () => hoisted.userData },
+	safeStorage: { isEncryptionAvailable: () => false },
+}))
+
+import { isJevConfigured, jevStatus, loadJevToken, saveJevSetup } from '../src/main/settings'
+import { CHOICE_THRESHOLD, COMMANDS, COMMAND_THRESHOLD, decideCommand, jevEndpoint, pickCommand, testJev } from '../src/services/jev'
 
 let savedTypeSafe: string | undefined
 let savedOpenRouter: string | undefined
@@ -9,6 +19,7 @@ beforeEach(() => {
 	savedOpenRouter = process.env.OPENROUTER_API_KEY
 	delete process.env.TYPESAFE_API_KEY
 	delete process.env.OPENROUTER_API_KEY
+	fs.rmSync(hoisted.userData, { recursive: true, force: true })
 	vi.unstubAllGlobals()
 })
 
@@ -17,6 +28,7 @@ afterEach(() => {
 	else process.env.TYPESAFE_API_KEY = savedTypeSafe
 	if (savedOpenRouter === undefined) delete process.env.OPENROUTER_API_KEY
 	else process.env.OPENROUTER_API_KEY = savedOpenRouter
+	fs.rmSync(hoisted.userData, { recursive: true, force: true })
 	vi.unstubAllGlobals()
 })
 
@@ -81,6 +93,57 @@ describe('decideCommand', () => {
 		vi.stubGlobal('fetch', fetchMock)
 		expect(await decideCommand('mute')).toBeNull()
 		expect(fetchMock).not.toHaveBeenCalled()
+	})
+})
+
+describe('testJev', () => {
+	function noulResponse(noul: number, status = 200): Response {
+		return new Response(JSON.stringify({ answers: { is_command: { noul } } }), { status })
+	}
+
+	it('resolves with the typesafe provider for a direct key', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(noulResponse(0.9)))
+		await expect(testJev('ts_x')).resolves.toEqual({ provider: 'typesafe' })
+	})
+
+	it('resolves with the openrouter provider for an sk-or- key', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(noulResponse(0.9))
+		vi.stubGlobal('fetch', fetchMock)
+		await expect(testJev('sk-or-x')).resolves.toEqual({ provider: 'openrouter' })
+		expect(fetchMock.mock.calls[0]?.[0]).toBe('https://openrouter.ai/api/alpha/decisions')
+	})
+
+	it('rejects on an auth failure', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 401 })))
+		await expect(testJev('ts_bad')).rejects.toThrow(/authentication/i)
+	})
+
+	it('rejects when fetch fails', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+		await expect(testJev('ts_x')).rejects.toThrow(/unreachable/i)
+	})
+})
+
+describe('jev settings', () => {
+	it('saves a key and reports configured with the typesafe provider', () => {
+		const status = saveJevSetup({ token: 'k' })
+		expect(isJevConfigured()).toBe(true)
+		expect(loadJevToken()).toBe('k')
+		expect(status).toEqual({ configured: true, provider: 'typesafe' })
+	})
+
+	it('reports the openrouter provider for an sk-or- key', () => {
+		expect(saveJevSetup({ token: 'sk-or-v1-abc' })).toEqual({ configured: true, provider: 'openrouter' })
+	})
+
+	it('throws when nothing is saved and the token is empty', () => {
+		expect(() => saveJevSetup({ token: '' })).toThrow(/required/)
+	})
+
+	it('keeps the saved key when the token is blank', () => {
+		saveJevSetup({ token: 'first' })
+		saveJevSetup({ token: '  ' })
+		expect(loadJevToken()).toBe('first')
 	})
 })
 
