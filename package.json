@@ -29,6 +29,7 @@
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": {
+        "LSUIElement": true,
         "NSMicrophoneUsageDescription": "Flow records short voice notes for dictation when you hold the hotkey."
       },
       "hardenedRuntime": false,
