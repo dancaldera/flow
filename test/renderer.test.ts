@@ -99,6 +99,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+	vi.unstubAllGlobals()
 	vi.useRealTimers()
 })
 
@@ -146,6 +147,73 @@ describe('audio capture', () => {
 				},
 			}),
 		)
+	})
+
+	it('releases a mic that opens after stop already arrived', async () => {
+		const enumerateDevices = vi.fn().mockResolvedValue([])
+		const medias: Array<(s: unknown) => void> = []
+		const getUserMedia = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					medias.push(resolve)
+				}),
+		)
+		Object.defineProperty(navigator, 'mediaDevices', {
+			configurable: true,
+			value: { enumerateDevices, getUserMedia },
+		})
+		const RecorderSpy = vi.fn()
+		;(RecorderSpy as unknown as { isTypeSupported: () => boolean }).isTypeSupported = () => true
+		vi.stubGlobal('MediaRecorder', RecorderSpy)
+
+		commandCbs.start?.()
+		await vi.waitFor(() => expect(getUserMedia).toHaveBeenCalled())
+		commandCbs.stop?.()
+		const track = { stop: vi.fn() }
+		medias[0]?.({ getTracks: () => [track] })
+		await vi.waitFor(() => expect(track.stop).toHaveBeenCalled())
+		expect(RecorderSpy).not.toHaveBeenCalled()
+	})
+
+	it('stops a previous stream when start fires twice', async () => {
+		const enumerateDevices = vi.fn().mockResolvedValue([])
+		const medias: Array<(s: unknown) => void> = []
+		const getUserMedia = vi.fn(
+			() =>
+				new Promise((resolve) => {
+					medias.push(resolve)
+				}),
+		)
+		Object.defineProperty(navigator, 'mediaDevices', {
+			configurable: true,
+			value: { enumerateDevices, getUserMedia },
+		})
+		const constructed = vi.fn()
+		vi.stubGlobal(
+			'MediaRecorder',
+			class {
+				state = 'recording'
+				ondataavailable = null
+				constructor() {
+					constructed()
+				}
+				start(): void {}
+				stop(): void {}
+				static isTypeSupported(): boolean {
+					return true
+				}
+			},
+		)
+
+		commandCbs.start?.()
+		await vi.waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1))
+		const track1 = { stop: vi.fn() }
+		medias[0]?.({ getTracks: () => [track1] })
+		await vi.waitFor(() => expect(constructed).toHaveBeenCalledTimes(1))
+		expect(track1.stop).not.toHaveBeenCalled()
+
+		commandCbs.start?.()
+		expect(track1.stop).toHaveBeenCalled()
 	})
 })
 

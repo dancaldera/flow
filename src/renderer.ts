@@ -25,6 +25,10 @@ const hint = document.getElementById('hint') as HTMLDivElement
 let recorder: MediaRecorder | null = null
 let stream: MediaStream | null = null
 let mime = 'audio/webm'
+// A stop that lands while getUserMedia is still pending must release the mic
+// once it resolves, or the recorder outlives the session and macOS keeps the
+// mic indicator on.
+let captureGeneration = 0
 
 function setUI(phase: string, message?: string, seconds?: number): void {
 	document.body.dataset.phase = phase
@@ -57,7 +61,12 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 async function startCapture(): Promise<void> {
+	const generation = ++captureGeneration
 	try {
+		if (stream) {
+			stream.getTracks().forEach((t) => t.stop())
+			stream = null
+		}
 		const devices = await navigator.mediaDevices.enumerateDevices()
 		const defaultOutputGroup = devices.find((device) => device.kind === 'audiooutput' && device.deviceId === 'default')?.groupId
 		const inputs = devices.filter((device) => device.kind === 'audioinput' && device.deviceId !== 'default')
@@ -67,7 +76,7 @@ async function startCapture(): Promise<void> {
 		const input =
 			inputs.find((device) => /MacBook|iMac|Studio Display|built-in|internal/i.test(device.label)) ??
 			(defaultOutputGroup ? inputs.find((device) => device.groupId !== defaultOutputGroup) : undefined)
-		stream = await navigator.mediaDevices.getUserMedia({
+		const media = await navigator.mediaDevices.getUserMedia({
 			audio: {
 				...(input ? { deviceId: { exact: input.deviceId } } : {}),
 				channelCount: 1,
@@ -77,6 +86,11 @@ async function startCapture(): Promise<void> {
 				autoGainControl: false,
 			},
 		})
+		if (generation !== captureGeneration) {
+			media.getTracks().forEach((t) => t.stop())
+			return
+		}
+		stream = media
 		mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
 		recorder = new MediaRecorder(stream, { mimeType: mime })
 		recorder.ondataavailable = (event: BlobEvent) => {
@@ -91,6 +105,7 @@ async function startCapture(): Promise<void> {
 }
 
 async function stopCapture(sendDone: boolean): Promise<void> {
+	captureGeneration++
 	const rec = recorder
 	recorder = null
 	if (rec && rec.state !== 'inactive') {
