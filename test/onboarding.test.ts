@@ -62,14 +62,11 @@ function loadOnboarding(): Promise<void> {
 		'<input id="llm-base-url" /><input id="llm-model" /><input id="llm-token" /><div id="llm-status"></div><button id="btn-test-llm"></button><span id="llm-test-status"></span>' +
 		'<input id="jev-token" /><div id="jev-status"></div><button id="btn-test-jev"></button><span id="jev-test-status"></span>' +
 		'<div id="jev-ready" class="hidden"><span id="dot-jev-key"></span><span id="dot-jev-ax"></span><span id="dot-jev-se"></span><span id="txt-jev-se"></span><span id="dot-jev-finder"></span><span id="txt-jev-finder"></span><button id="btn-check-automation"></button><button id="btn-open-automation"></button><span id="jev-ready-status"></span></div>' +
-		'<div id="error"></div><button id="btn-save">Continue</button>' +
-		'</section>' +
-		'<section id="permissions-step" class="hidden">' +
 		'<span id="dot-mic"></span><button id="btn-mic"></button>' +
 		'<span id="dot-fn"></span><p id="fn-hint"></p>' +
 		'<span id="dot-im"></span><button id="btn-im"></button><span id="dot-ax"></span><button id="btn-ax"></button>' +
 		'<button id="btn-restart"></button>' +
-		'<button id="btn-change"></button><button id="btn-done"></button>' +
+		'<div id="error"></div><button id="btn-save">Save</button><button id="btn-done"></button>' +
 		'</section>'
 	;(window as unknown as { flowSetup: unknown }).flowSetup = {
 		get: () => Promise.resolve(stateFixture),
@@ -222,7 +219,7 @@ describe('language options', () => {
 })
 
 describe('save and permissions flow', () => {
-	it('saves the selected setup and advances to the permissions step', async () => {
+	it('saves the selected setup and stays on the page', async () => {
 		input('token').value = 'fresh-key'
 		;(el('btn-save') as HTMLButtonElement).click()
 		await vi.waitFor(() =>
@@ -231,19 +228,13 @@ describe('save and permissions flow', () => {
 				arg: { provider: 'openai', accountId: '', gatewayId: '', model: 'whisper-1', language: 'es', token: 'fresh-key' },
 			}),
 		)
-		expect(el('setup-step').classList.contains('hidden')).toBe(true)
-		expect(el('permissions-step').classList.contains('hidden')).toBe(false)
+		expect(el('error').textContent).toBe('')
 	})
 
-	it('stays on the setup step when the save fails', async () => {
-		// A configured install lands on the permissions step; "Change setup" is
-		// the real path back to the form.
-		;(el('btn-change') as HTMLButtonElement).click()
+	it('shows the error when the save fails', async () => {
 		;(window as unknown as { flowSetup: { save: () => Promise<never> } }).flowSetup.save = () => Promise.reject(new Error('bad key'))
 		;(el('btn-save') as HTMLButtonElement).click()
 		await vi.waitFor(() => expect(el('error').textContent).toBe('bad key'))
-		expect(el('setup-step').classList.contains('hidden')).toBe(false)
-		expect(el('permissions-step').classList.contains('hidden')).toBe(true)
 	})
 
 	it('enables Done only when configured with mic and accessibility granted', async () => {

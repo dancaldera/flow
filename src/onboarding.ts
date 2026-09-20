@@ -32,8 +32,6 @@ declare global {
 	}
 }
 
-const setupStep = document.getElementById('setup-step') as HTMLElement
-const permissionsStep = document.getElementById('permissions-step') as HTMLElement
 const providerSelect = document.getElementById('provider') as HTMLSelectElement
 const modelSearch = document.getElementById('model-search') as HTMLInputElement
 const modelSelect = document.getElementById('model') as HTMLSelectElement
@@ -80,7 +78,6 @@ const btnIm = document.getElementById('btn-im') as HTMLButtonElement
 const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement
 const btnSave = document.getElementById('btn-save') as HTMLButtonElement
 const btnDone = document.getElementById('btn-done') as HTMLButtonElement
-const btnChange = document.getElementById('btn-change') as HTMLButtonElement
 
 let state: OnboardingState | null = null
 let providerId = ''
@@ -354,16 +351,6 @@ async function checkAutomationAccess(): Promise<void> {
 	await refresh()
 }
 
-function showPermissions(): void {
-	setupStep.classList.add('hidden')
-	permissionsStep.classList.remove('hidden')
-}
-
-function showSetup(): void {
-	permissionsStep.classList.add('hidden')
-	setupStep.classList.remove('hidden')
-}
-
 async function refresh(): Promise<void> {
 	try {
 		if (!window.flowSetup) {
@@ -469,7 +456,6 @@ btnSave.onclick = () =>
 				jevToken.value = ''
 			}
 			await refresh()
-			showPermissions()
 		} catch (cause) {
 			error.textContent = cause instanceof Error ? cause.message : 'Could not save setup.'
 		} finally {
@@ -485,9 +471,8 @@ btnIm.onclick = () => {
 	openedSettings = true
 	void window.flowSetup.openInputMonitoring().then(refresh)
 }
-btnChange.onclick = showSetup
 btnRestart.onclick = () => void window.flowSetup.restart()
 btnDone.onclick = () => void window.flowSetup.complete().then((started) => started && window.close())
 
-void refresh().then(() => (state?.setup.configured ? showPermissions() : showSetup()))
+void refresh()
 setInterval(() => void refresh(), 1500)

@@ -19,14 +19,11 @@ function loadOnboarding(): Promise<void> {
 		'<input id="llm-base-url" /><input id="llm-model" /><input id="llm-token" /><div id="llm-status"></div><button id="btn-test-llm"></button><span id="llm-test-status"></span>' +
 		'<input id="jev-token" /><div id="jev-status"></div><button id="btn-test-jev"></button><span id="jev-test-status"></span>' +
 		'<div id="jev-ready" class="hidden"><span id="dot-jev-key"></span><span id="dot-jev-ax"></span><span id="dot-jev-se"></span><span id="txt-jev-se"></span><span id="dot-jev-finder"></span><span id="txt-jev-finder"></span><button id="btn-check-automation"></button><button id="btn-open-automation"></button><span id="jev-ready-status"></span></div>' +
-		'<div id="error"></div><button id="btn-save">Continue</button>' +
-		'</section>' +
-		'<section id="permissions-step" class="hidden">' +
 		'<span id="dot-mic"></span><button id="btn-mic"></button>' +
 		'<span id="dot-fn"></span><p id="fn-hint"></p>' +
 		'<span id="dot-im"></span><button id="btn-im"></button><span id="dot-ax"></span><button id="btn-ax"></button>' +
 		'<button id="btn-restart"></button>' +
-		'<button id="btn-change"></button><button id="btn-done"></button>' +
+		'<div id="error"></div><button id="btn-save">Save</button><button id="btn-done"></button>' +
 		'</section>'
 	;(window as unknown as { flowSetup: unknown }).flowSetup = {
 		get: () =>
@@ -134,7 +131,6 @@ describe('onboarding llm section', () => {
 		input('llm-token').value = 'sekret'
 		;(el('btn-save') as HTMLButtonElement).click()
 		await vi.waitFor(() => expect(calls).toContainEqual({ method: 'saveLlm', arg: { baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3', token: 'sekret' } }))
-		expect(el('setup-step').classList.contains('hidden')).toBe(true)
 	})
 
 	it('blocks progress when the llm save fails', async () => {
@@ -142,7 +138,6 @@ describe('onboarding llm section', () => {
 		saveLlmError = 'LLM endpoint must be an http(s) URL.'
 		;(el('btn-save') as HTMLButtonElement).click()
 		await vi.waitFor(() => expect(el('error').textContent).toBe('LLM endpoint must be an http(s) URL.'))
-		expect(el('setup-step').classList.contains('hidden')).toBe(false)
 	})
 
 	it('tests the selected LLM settings without saving them', async () => {
@@ -176,7 +171,6 @@ describe('onboarding jev section', () => {
 		input('jev-token').value = 'jev-secret'
 		;(el('btn-save') as HTMLButtonElement).click()
 		await vi.waitFor(() => expect(calls).toContainEqual({ method: 'saveJev', arg: { token: 'jev-secret' } }))
-		expect(el('setup-step').classList.contains('hidden')).toBe(true)
 	})
 
 	it('skips the jev save when untouched', async () => {
