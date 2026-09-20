@@ -9,7 +9,7 @@ export interface PermissionReport {
 	microphone: PermissionState
 	accessibility: PermissionState
 	inputMonitoring?: PermissionState
-	axHint?: string
+	fnHint?: string
 }
 
 /** Microphone: promptable programmatically. */
@@ -125,12 +125,10 @@ export async function fnTapState(
 	} catch (error) {
 		const err = error as Error & { code?: number; killed?: boolean }
 		if (err.killed) return { state: 'unknown' }
+		// Exit 3 means the helper never reached the Accessibility tap test —
+		// it bailed on missing Input Monitoring first, so accessibility is unknown.
 		if (err.code === 3) {
-			return {
-				state: 'missing',
-				needsInputMonitoring: true,
-				hint: 'macOS hides <b>real</b> fn key presses behind Input Monitoring — Accessibility alone is not enough. Toggle Flow on in the Input Monitoring list.',
-			}
+			return { state: 'unknown', needsInputMonitoring: true }
 		}
 		return { state: 'missing' }
 	}
@@ -141,8 +139,8 @@ export async function report(): Promise<PermissionReport> {
 	return {
 		microphone: microphoneStatus(),
 		accessibility: fn.state,
-		inputMonitoring: fn.needsInputMonitoring ? 'missing' : fn.state === 'granted' ? 'granted' : 'unknown',
-		axHint: fn.hint,
+		inputMonitoring: fn.needsInputMonitoring ? 'missing' : fn.state === 'unknown' ? 'unknown' : 'granted',
+		fnHint: fn.hint,
 	}
 }
 

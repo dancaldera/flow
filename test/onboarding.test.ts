@@ -66,8 +66,9 @@ function loadOnboarding(): Promise<void> {
 		'</section>' +
 		'<section id="permissions-step" class="hidden">' +
 		'<span id="dot-mic"></span><button id="btn-mic"></button>' +
-		'<span id="dot-ax"></span><p id="ax-hint"></p><button id="btn-ax"></button>' +
-		'<span id="dot-im"></span><button id="btn-im"></button><button id="btn-restart"></button>' +
+		'<span id="dot-fn"></span><p id="fn-hint"></p>' +
+		'<span id="dot-im"></span><button id="btn-im"></button><span id="dot-ax"></span><button id="btn-ax"></button>' +
+		'<button id="btn-restart"></button>' +
 		'<button id="btn-change"></button><button id="btn-done"></button>' +
 		'</section>'
 	;(window as unknown as { flowSetup: unknown }).flowSetup = {
@@ -91,7 +92,10 @@ function loadOnboarding(): Promise<void> {
 		openAutomation: () => Promise.resolve(),
 		requestMic: () => Promise.resolve(true),
 		promptAccessibility: () => Promise.resolve(),
-		openInputMonitoring: () => Promise.resolve(),
+		openInputMonitoring: () => {
+			calls.push({ method: 'openInputMonitoring' })
+			return Promise.resolve()
+		},
 		restart: () => Promise.resolve(),
 		complete: () => {
 			calls.push({ method: 'complete' })
@@ -252,5 +256,47 @@ describe('save and permissions flow', () => {
 	it('calls complete when Done is clicked', async () => {
 		;(el('btn-done') as HTMLButtonElement).click()
 		await vi.waitFor(() => expect(calls).toContainEqual({ method: 'complete' }))
+	})
+
+	it('guides through Input Monitoring first when it is missing', async () => {
+		stateFixture = { ...freshState(), permissions: { microphone: 'granted', accessibility: 'unknown', inputMonitoring: 'missing' } }
+		await vi.advanceTimersByTimeAsync(1600)
+		await vi.waitFor(() => {
+			expect(el('dot-ax').className).toBe('dot unknown')
+			expect(el('dot-im').className).toBe('dot missing')
+			expect(el('dot-fn').className).toBe('dot missing')
+			expect(el('btn-im').classList.contains('btn-primary')).toBe(true)
+			expect(el('btn-ax').classList.contains('btn-primary')).toBe(false)
+			expect(el('fn-hint').textContent).toMatch(/Input Monitoring/)
+			expect(el('btn-restart').classList.contains('hidden')).toBe(true)
+		})
+		;(el('btn-im') as HTMLButtonElement).click()
+		await vi.waitFor(() => expect(el('btn-restart').classList.contains('hidden')).toBe(false))
+		expect(calls.map((c) => c.method)).toContain('openInputMonitoring')
+	})
+
+	it('points at Accessibility once Input Monitoring is granted', async () => {
+		stateFixture = { ...freshState(), permissions: { microphone: 'granted', accessibility: 'missing', inputMonitoring: 'granted' } }
+		await vi.advanceTimersByTimeAsync(1600)
+		await vi.waitFor(() => {
+			expect(el('btn-ax').classList.contains('btn-primary')).toBe(true)
+			expect((el('btn-im') as HTMLButtonElement).disabled).toBe(true)
+			expect(el('btn-im').textContent).toBe('Enabled ✓')
+			expect(el('fn-hint').textContent).toMatch(/Accessibility/)
+		})
+	})
+
+	it('shows Ready when both fn permissions are granted and never offers restart', async () => {
+		await vi.waitFor(() => {
+			expect(el('dot-fn').className).toBe('dot granted')
+			expect((el('btn-im') as HTMLButtonElement).disabled).toBe(true)
+			expect(el('btn-im').textContent).toBe('Enabled ✓')
+			expect((el('btn-ax') as HTMLButtonElement).disabled).toBe(true)
+			expect(el('btn-ax').textContent).toBe('Enabled ✓')
+			expect(el('fn-hint').textContent).toMatch(/Ready/)
+		})
+		;(el('btn-ax') as HTMLButtonElement).click()
+		await vi.advanceTimersByTimeAsync(1600)
+		expect(el('btn-restart').classList.contains('hidden')).toBe(true)
 	})
 })

@@ -81,14 +81,22 @@ describe('accessibilityStatus', () => {
 })
 
 describe('report', () => {
-	it('maps a denied fn helper to missing accessibility and input monitoring', async () => {
+	it('maps a helper denied at Input Monitoring to missing IM and unknown accessibility', async () => {
 		fakeHelper(3)
 		hoisted.mediaStatus = 'granted'
 		const r = await report()
 		expect(r.microphone).toBe('granted')
-		expect(r.accessibility).toBe('missing')
+		expect(r.accessibility).toBe('unknown')
 		expect(r.inputMonitoring).toBe('missing')
-		expect(r.axHint).toMatch(/Input Monitoring/)
+		expect(r.fnHint).toBeUndefined()
+	})
+
+	it('maps a tap denial past Input Monitoring to missing accessibility and granted IM', async () => {
+		fakeHelper(1)
+		const r = await report()
+		expect(r.accessibility).toBe('missing')
+		expect(r.inputMonitoring).toBe('granted')
+		expect(r.fnHint).toBeUndefined()
 	})
 
 	it('maps a working helper to granted', async () => {
@@ -102,7 +110,7 @@ describe('report', () => {
 		const r = await report()
 		expect(r.accessibility).toBe('unknown')
 		expect(r.inputMonitoring).toBe('unknown')
-		expect(r.axHint).toBeTruthy()
+		expect(r.fnHint).toBeTruthy()
 	})
 })
 

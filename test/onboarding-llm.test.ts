@@ -23,8 +23,9 @@ function loadOnboarding(): Promise<void> {
 		'</section>' +
 		'<section id="permissions-step" class="hidden">' +
 		'<span id="dot-mic"></span><button id="btn-mic"></button>' +
-		'<span id="dot-ax"></span><p id="ax-hint"></p><button id="btn-ax"></button>' +
-		'<span id="dot-im"></span><button id="btn-im"></button><button id="btn-restart"></button>' +
+		'<span id="dot-fn"></span><p id="fn-hint"></p>' +
+		'<span id="dot-im"></span><button id="btn-im"></button><span id="dot-ax"></span><button id="btn-ax"></button>' +
+		'<button id="btn-restart"></button>' +
 		'<button id="btn-change"></button><button id="btn-done"></button>' +
 		'</section>'
 	;(window as unknown as { flowSetup: unknown }).flowSetup = {

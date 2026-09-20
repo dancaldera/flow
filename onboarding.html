@@ -97,7 +97,7 @@
 <section id="permissions-step" class="hidden space-y-3">
 <div>
 <h1 class="text-xl font-bold tracking-tight">Allow Flow</h1>
-<p class="text-[13px] text-neutral-500 dark:text-neutral-400">One more step: Flow needs these two macOS permissions before it can dictate.</p>
+<p class="text-[13px] text-neutral-500 dark:text-neutral-400">Flow needs macOS permission to hear your mic and the fn key.</p>
 </div>
 <div class="flex gap-3 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#2c2c2e]">
 <span id="dot-mic" class="dot unknown"></span>
@@ -108,19 +108,15 @@
 </div>
 </div>
 <div class="flex gap-3 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#2c2c2e]">
-<span id="dot-ax" class="dot unknown"></span>
+<span id="dot-fn" class="dot unknown"></span>
 <div class="min-w-0 flex-1">
-<h2 class="text-[13px] font-semibold">Accessibility</h2>
-<p id="ax-hint" class="mt-0.5 mb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.</p>
-<div class="flex flex-wrap gap-2"><button id="btn-ax" class="btn btn-primary">Open Accessibility Settings</button></div>
+<h2 class="text-[13px] font-semibold">fn hotkey</h2>
+<p id="fn-hint" class="mt-0.5 mb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">Lets Flow hear <b>fn</b> anywhere and paste at your cursor. macOS needs Flow switched on in two places — turn each on, then restart Flow.</p>
+<div class="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3 space-y-2">
+<div class="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300 [&>.dot]:mt-0"><span id="dot-im" class="dot unknown"></span><span class="flex-1">Input Monitoring</span><button id="btn-im" class="btn px-2.5 py-1 text-xs">Open Settings</button></div>
+<div class="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300 [&>.dot]:mt-0"><span id="dot-ax" class="dot unknown"></span><span class="flex-1">Accessibility</span><button id="btn-ax" class="btn px-2.5 py-1 text-xs">Open Settings</button></div>
 </div>
-</div>
-<div class="flex gap-3 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#2c2c2e]">
-<span id="dot-im" class="dot unknown"></span>
-<div class="min-w-0 flex-1">
-<h2 class="text-[13px] font-semibold">Input Monitoring</h2>
-<p id="im-hint" class="mt-0.5 mb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">Required for the <b>fn</b> hotkey on modern macOS — Accessibility alone does not deliver real fn presses. Toggle Flow on in the list, then <b>restart Flow</b>: macOS applies this permission only when the app launches.</p>
-<div class="flex flex-wrap gap-2"><button id="btn-im" class="btn">Open Input Monitoring Settings</button><button id="btn-restart" class="btn hidden">Restart Flow</button></div>
+<div class="mt-3 flex flex-wrap gap-2"><button id="btn-restart" class="btn hidden">Restart Flow</button></div>
 </div>
 </div>
 <footer class="sticky bottom-0 -mx-4 -mb-4 mt-2 flex items-center justify-between gap-3 border-t border-black/[0.08] bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-[#1c1c1e]/90">

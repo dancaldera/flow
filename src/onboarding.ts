@@ -7,9 +7,9 @@ type Setup = { provider: string; model: string; language: string; configured: bo
 type LlmState = { baseUrl: string; model: string; configured: boolean }
 type JevState = { configured: boolean; provider: 'openrouter' | 'typesafe' | null }
 type AutomationState = Partial<Record<'System Events' | 'Finder', PermissionState>>
-type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; axHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState; jev: JevState; automation: AutomationState }
+type OnboardingState = { permissions: { microphone: PermissionState; accessibility: PermissionState; inputMonitoring?: PermissionState; fnHint?: string }; setup: Setup; providers: Provider[]; configuredProviders: string[]; llm: LlmState; jev: JevState; automation: AutomationState }
 
-const DEFAULT_AX_HINT = 'Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.'
+const DEFAULT_FN_HINT = 'Lets Flow hear <b>fn</b> anywhere and paste at your cursor. macOS needs Flow switched on in two places — turn each on, then restart Flow.'
 
 declare global {
 	interface Window {
@@ -73,7 +73,8 @@ const dotMic = document.getElementById('dot-mic') as HTMLSpanElement
 const btnMic = document.getElementById('btn-mic') as HTMLButtonElement
 const dotAx = document.getElementById('dot-ax') as HTMLSpanElement
 const dotIm = document.getElementById('dot-im') as HTMLSpanElement
-const axHint = document.getElementById('ax-hint') as HTMLParagraphElement
+const dotFn = document.getElementById('dot-fn') as HTMLSpanElement
+const fnHint = document.getElementById('fn-hint') as HTMLParagraphElement
 const btnAx = document.getElementById('btn-ax') as HTMLButtonElement
 const btnIm = document.getElementById('btn-im') as HTMLButtonElement
 const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement
@@ -86,6 +87,7 @@ let providerId = ''
 let modelsFor = ''
 let langsFor = ''
 let llmInit = false
+let openedSettings = false
 
 function selectedProvider(): Provider | undefined {
 	return state?.providers.find((provider) => provider.id === providerId)
@@ -395,14 +397,29 @@ async function refresh(): Promise<void> {
 	renderLlm()
 	renderJev()
 	dotMic.className = `dot ${state.permissions.microphone}`
-	dotAx.className = `dot ${state.permissions.accessibility}`
-	dotIm.className = `dot ${state.permissions.inputMonitoring ?? 'unknown'}`
 	btnMic.disabled = state.permissions.microphone === 'granted'
 	btnMic.textContent = btnMic.disabled ? 'Enabled ✓' : 'Enable Microphone'
-	axHint.innerHTML = state.permissions.axHint ?? DEFAULT_AX_HINT
-	btnAx.textContent = state.permissions.accessibility === 'granted' ? 'Granted ✓ — re-open Settings' : 'Open Accessibility Settings'
-	btnIm.textContent = state.permissions.inputMonitoring === 'granted' ? 'Enabled ✓ — re-open Settings' : 'Open Input Monitoring Settings'
-	btnRestart.classList.toggle('hidden', state.permissions.accessibility === 'granted')
+	const ax = state.permissions.accessibility
+	const im = state.permissions.inputMonitoring ?? 'unknown'
+	dotIm.className = `dot ${im}`
+	dotAx.className = `dot ${ax}`
+	dotFn.className = `dot ${ax === 'granted' ? 'granted' : im === 'missing' || ax === 'missing' ? 'missing' : 'unknown'}`
+	fnHint.innerHTML =
+		state.permissions.fnHint ??
+		(ax === 'granted'
+			? 'Ready ✓ — Flow can hear <b>fn</b> and paste at your cursor.'
+			: im === 'missing'
+				? 'Turn Flow on under <b>Input Monitoring</b> first, then restart Flow.'
+				: ax === 'missing'
+					? 'Now turn Flow on under <b>Accessibility</b>, then restart Flow.'
+					: DEFAULT_FN_HINT)
+	btnIm.disabled = im === 'granted'
+	btnIm.textContent = btnIm.disabled ? 'Enabled ✓' : 'Open Settings'
+	btnIm.classList.toggle('btn-primary', im === 'missing')
+	btnAx.disabled = ax === 'granted'
+	btnAx.textContent = btnAx.disabled ? 'Enabled ✓' : 'Open Settings'
+	btnAx.classList.toggle('btn-primary', im === 'granted' && ax === 'missing')
+	btnRestart.classList.toggle('hidden', !openedSettings || ax === 'granted')
 	btnDone.disabled = !state.setup.configured || state.permissions.microphone !== 'granted' || state.permissions.accessibility !== 'granted'
 }
 
@@ -460,8 +477,14 @@ btnSave.onclick = () =>
 		}
 	})()
 btnMic.onclick = () => void window.flowSetup.requestMic().then(refresh)
-btnAx.onclick = () => void window.flowSetup.promptAccessibility().then(refresh)
-btnIm.onclick = () => void window.flowSetup.openInputMonitoring()
+btnAx.onclick = () => {
+	openedSettings = true
+	void window.flowSetup.promptAccessibility().then(refresh)
+}
+btnIm.onclick = () => {
+	openedSettings = true
+	void window.flowSetup.openInputMonitoring().then(refresh)
+}
 btnChange.onclick = showSetup
 btnRestart.onclick = () => void window.flowSetup.restart()
 btnDone.onclick = () => void window.flowSetup.complete().then((started) => started && window.close())
