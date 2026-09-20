@@ -28,6 +28,7 @@ There is no linter/formatter configured — `biome.json` exists but no script wi
 - `src/services/stt.ts` — STT provider seam (`SttProvider`); adding a provider = new class, no rewrites.
 - `src/services/jev.ts` — TypeSafe Jev decision model (`TYPESAFE_API_KEY` / `OPENROUTER_API_KEY` env); routes short transcripts to macOS commands via osascript, falls back to paste.
 - `src/renderer.ts` + `index.html` + `styles/pill.css` — pill UI + mic capture. The renderer loads as a plain `<script src>` — it CANNOT import modules compiled to CJS (no `require`); keep it dependency-free or the build's strip step fails.
+- `onboarding.html` is styled with Tailwind CSS v4: `styles/onboarding.tw.css` → `dist/styles/onboarding.css` via `@tailwindcss/cli`, run by `pnpm build`/`pnpm dev`. The pill (`styles/pill.css`) and `history.html` are NOT on Tailwind. State classes toggled from `src/onboarding.ts` (`hidden`, `saved`, `dot granted|missing|unknown`, `test-status ok|fail`) are styled in the `@layer components` block — keep their names.
 - `src/ipc.ts` — shared IPC channel names + types; safe to import from main AND renderer (pure types/constants only).
 - `swift/` — native helpers (`fn` tap, fullscreen check, `flow-lock` screen-lock); prebuilt binaries are committed, `asarUnpack`ed at package time.
 - `src/main/updates.ts` — in-app updater: pure helpers (version compare, asset pick) unit-tested; `checkForUpdates()` is the tray-menu flow (public GitHub API, no token).

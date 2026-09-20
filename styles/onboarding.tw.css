@@ -1,0 +1,40 @@
+@import "tailwindcss" source(none);
+@source "../onboarding.html";
+@source "../src/onboarding.ts";
+
+@layer components {
+	.field {
+		@apply w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-inherit shadow-none outline-none transition placeholder:text-neutral-400 focus:border-[#007aff] focus:ring-[3px] focus:ring-[#007aff]/20 dark:border-white/15 dark:bg-[#1c1c1e] dark:placeholder:text-neutral-500;
+	}
+
+	.btn {
+		@apply inline-flex items-center justify-center rounded-lg border border-black/10 bg-white px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap transition hover:bg-black/[0.04] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#007aff]/30 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:hover:bg-white/10;
+	}
+
+	.btn-primary {
+		@apply border-[#007aff] bg-[#007aff] text-white hover:bg-[#0071e3] dark:border-[#0a84ff] dark:bg-[#0a84ff] dark:hover:bg-[#3395ff];
+	}
+
+	.dot {
+		@apply mt-[3px] size-2.5 shrink-0 rounded-full bg-neutral-400 shadow-[0_0_0_3px_rgb(163_163_163/0.2)];
+	}
+	.dot.granted {
+		@apply bg-emerald-500 shadow-[0_0_0_3px_rgb(16_185_129/0.2)];
+	}
+	.dot.missing {
+		@apply bg-amber-500 shadow-[0_0_0_3px_rgb(245_158_11/0.2)];
+	}
+	.dot.unknown {
+		@apply bg-neutral-400 shadow-[0_0_0_3px_rgb(163_163_163/0.2)];
+	}
+
+	.test-status {
+		@apply flex-1 text-xs text-neutral-500 dark:text-neutral-400;
+	}
+	.test-status.ok {
+		@apply text-emerald-600 dark:text-emerald-400;
+	}
+	.test-status.fail {
+		@apply text-red-600 dark:text-red-400;
+	}
+}

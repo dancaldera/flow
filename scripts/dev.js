@@ -1,7 +1,9 @@
 // Lean dev loop: rebuild + restart Electron on change. Node builtins only,
 // no extra dependencies. Watches src/**/*.ts (full `tsc` re-emit + prelude
 // strip, since the strip step only works on a fresh emit) and restarts the
-// app for static files (index.html, onboarding.html, styles/**).
+// app for static files (index.html). onboarding.html and styles/** trigger
+// a full rebuild too — Tailwind class scanning for dist/styles/onboarding.css
+// depends on them.
 //
 // Usage: pnpm dev   (FLOW_DEV=1 is set on the child for future dev-only hooks)
 'use strict'
@@ -12,6 +14,10 @@ const path = require('node:path')
 
 const root = path.join(__dirname, '..')
 const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc')
+const twCli = path.join(
+	path.dirname(require.resolve('@tailwindcss/cli/package.json')),
+	require('@tailwindcss/cli/package.json').bin.tailwindcss,
+)
 const strip = path.join(__dirname, 'strip-cjs-prelude.js')
 const electronPath = require('electron')
 
@@ -36,6 +42,15 @@ function build() {
 	const stripped = spawnSync(process.execPath, [strip], { cwd: root, stdio: 'inherit' })
 	if (stripped.status !== 0) {
 		log('strip-cjs-prelude failed')
+		return false
+	}
+	const tailwind = spawnSync(
+		process.execPath,
+		[twCli, '-i', 'styles/onboarding.tw.css', '-o', 'dist/styles/onboarding.css', '--minify'],
+		{ cwd: root, stdio: 'inherit' },
+	)
+	if (tailwind.status !== 0) {
+		log('tailwindcss failed')
 		return false
 	}
 	return true
@@ -113,17 +128,21 @@ watch(path.join(root, 'src'), (filename) => {
 	if (!filename || !filename.endsWith('.ts')) return
 	scheduleRebuild()
 })
-for (const staticFile of ['index.html', 'onboarding.html']) {
-	watch(path.join(root, staticFile), () => {
-		if (stopping) return
-		log(`${staticFile} changed — relaunching…`)
-		relaunch()
-	})
-}
+watch(path.join(root, 'index.html'), () => {
+	if (stopping) return
+	log('index.html changed — relaunching…')
+	relaunch()
+})
+// onboarding.html is a Tailwind @source — class changes need a rebuild.
+watch(path.join(root, 'onboarding.html'), () => {
+	if (stopping) return
+	log('onboarding.html changed — rebuilding…')
+	scheduleRebuild()
+})
 watch(path.join(root, 'styles'), () => {
 	if (stopping) return
-	log('styles changed — relaunching…')
-	relaunch()
+	log('styles changed — rebuilding…')
+	scheduleRebuild()
 })
 
 log('watching src/**/*.ts, *.html, styles/** (Ctrl+C to stop)')

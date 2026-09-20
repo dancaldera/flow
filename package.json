@@ -41,10 +41,12 @@
   },
   "description": "Flow — lean open-source push-to-talk dictation for macOS (fn to talk, Gateway STT, paste at cursor).",
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^22.7.0",
     "electron": "^41.2.1",
     "electron-builder": "^26.0.12",
     "jsdom": "^30.0.1",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.6.3",
     "vitest": "^3.1.0"
   },
@@ -56,7 +58,7 @@
   "name": "flow",
   "private": false,
   "scripts": {
-    "build": "tsc && node scripts/strip-cjs-prelude.js",
+    "build": "tsc && node scripts/strip-cjs-prelude.js && tailwindcss -i styles/onboarding.tw.css -o dist/styles/onboarding.css --minify",
     "check": "tsc --noEmit",
     "dev": "node scripts/dev.js",
     "package": "npm run build && electron-builder build --mac --publish never",

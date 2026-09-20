@@ -4,49 +4,129 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Flow — Setup</title>
-<style>
-body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px; color: #1d1d1f; background: #f5f5f7; }
-section { background: #fff; border: 1px solid #e5e5ea; border-radius: 14px; padding: 16px; }
-h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; margin: 0 0 4px; } p.sub { font-size: 13px; color: #666; margin: 0 0 8px; }
-.row { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #e5e5ea; border-radius: 12px; padding: 12px; margin-bottom: 10px; background: #fff; }
-.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; } .dot.granted { background: #30d158; } .dot.missing { background: #ff9f0a; } .dot.unknown { background: #aaa; }
-.row h2 { font-size: 14px; margin: 0 0 2px; } .row p { font-size: 12px; color: #555; margin: 0 0 8px; }
-label { display: block; font-size: 12px; font-weight: 600; color: #3a3a3c; margin: 9px 0 5px; } input, select { box-sizing: border-box; width: 100%; font: inherit; padding: 8px 10px; border: 1px solid #d1d1d6; border-radius: 10px; background: #fff; }
-.llm-row { display: flex; gap: 8px; } .llm-row input:first-child { flex: 3; } .llm-row input:last-child { flex: 2; }
-input:focus, select:focus { outline: none; border-color: #007aff; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15); }
-input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; } input::placeholder { color: #aeaeb2; } #model-search, #language-search { font-family: inherit; } #model, #language { margin-top: 4px; } #model-hint, #language-hint { margin-top: 6px; min-height: 14px; background: #f5f5f7; border-radius: 8px; padding: 6px 8px; } #key-status, #llm-status, #jev-status { font-size: 12px; color: #555; margin-top: 4px; min-height: 14px; } #key-status.saved, #llm-status.saved, #jev-status.saved { color: #1a7f37; } .test-row { display: flex; align-items: center; gap: 8px; min-height: 30px; margin-top: 6px; } .test-status { flex: 1; font-size: 12px; color: #555; } .test-status.ok { color: #1a7f37; } .test-status.fail { color: #c21d16; } .ready { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #555; margin-top: 4px; } .hidden { display: none; } .model { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #555; }
-button { font-size: 13px; padding: 7px 14px; border-radius: 10px; border: 1px solid #d1d1d6; background: #fff; cursor: pointer; } button:hover:not(:disabled) { background: #f0f0f2; } button.primary { background: #007aff; border-color: #007aff; color: #fff; } button.primary:hover:not(:disabled) { background: #006ee6; } button:disabled { opacity: 0.45; cursor: default; }
-footer { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; } footer small { font-size: 11px; color: #888; max-width: 260px; } #error { color: #c21d16; background: #fdecea; border-radius: 8px; padding: 6px 8px; font-size: 12px; margin: 10px 0; } #error:empty { display: none; }
-</style>
+<link rel="stylesheet" href="./dist/styles/onboarding.css" />
 </head>
-<body>
-<section id="setup-step">
-<h1>Choose transcription</h1>
-<p class="sub">Your key is encrypted in your macOS user profile and never saved in settings.json.</p>
-<label for="provider">Provider</label><select id="provider"></select>
-<label for="model-search">Transcription model</label><input id="model-search" type="search" placeholder="Search models…" autocomplete="off" /><select id="model"></select><div id="model-hint" class="model"></div>
-<label for="language-search">Language</label><input id="language-search" type="search" placeholder="Search languages…" autocomplete="off" /><select id="language"></select><div id="language-hint" class="model"></div>
-<div id="cloudflare-fields" class="hidden"><label for="account-id">Cloudflare account ID</label><input id="account-id" autocomplete="off" /><label for="gateway-id">Gateway ID</label><input id="gateway-id" value="flow" autocomplete="off" /></div>
-<label for="token">API key</label><input id="token" type="password" autocomplete="off" /><div id="key-status"></div><div class="test-row"><button id="btn-test-stt" type="button">Test transcription</button><span id="stt-test-status" class="test-status"></span></div>
-<label for="llm-base-url">Meeting summaries — endpoint &amp; model (optional)</label><div class="llm-row"><input id="llm-base-url" placeholder="https://api.openai.com/v1" autocomplete="off" /><input id="llm-model" placeholder="gpt-4o-mini" autocomplete="off" /></div>
-<label for="llm-token">LLM API key</label><input id="llm-token" type="password" autocomplete="off" /><div id="llm-status"></div><div class="test-row"><button id="btn-test-llm" type="button">Test LLM</button><span id="llm-test-status" class="test-status"></span></div>
-<label for="jev-token">Voice commands — TypeSafe or OpenRouter API key (optional)</label><input id="jev-token" type="password" autocomplete="off" /><div id="jev-status"></div><div class="test-row"><button id="btn-test-jev" type="button">Test Jev</button><span id="jev-test-status" class="test-status"></span></div>
-<div id="jev-ready" class="hidden">
-<div class="ready"><span id="dot-jev-key" class="dot unknown"></span><span>Jev key saved and tested</span></div>
-<div class="ready"><span id="dot-jev-ax" class="dot unknown"></span><span>Accessibility — needed for undo, copy, select all…</span></div>
-<div class="ready"><span id="dot-jev-se" class="dot unknown"></span><span id="txt-jev-se">Automation: System Events — not checked yet</span></div>
-<div class="ready"><span id="dot-jev-finder" class="dot unknown"></span><span id="txt-jev-finder">Automation: Finder — not checked yet</span></div>
-<div class="test-row"><button id="btn-check-automation" type="button">Check &amp; grant access</button><button id="btn-open-automation" type="button">Open Automation Settings</button><span id="jev-ready-status" class="test-status"></span></div>
-<p class="sub" style="margin:6px 0 0">Terminal and Safari ask for permission the first time you open them by voice — click Allow.</p>
+<body class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f] antialiased dark:bg-[#1c1c1e] dark:text-[#f5f5f7] p-4 font-sans text-[13px]">
+<section id="setup-step" class="space-y-3">
+<div>
+<h1 class="text-xl font-bold tracking-tight">Choose transcription</h1>
+<p class="text-[13px] text-neutral-500 dark:text-neutral-400">Your key is encrypted in your macOS user profile and never saved in settings.json.</p>
 </div>
-<div id="error"></div><footer><small>You can change the provider later from the tray menu.</small><button id="btn-save" class="primary">Continue</button></footer>
+<div class="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm space-y-3 dark:border-white/10 dark:bg-[#2c2c2e]">
+<h2 class="text-sm font-semibold">Transcription</h2>
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="provider">Provider</label>
+<select id="provider" class="field"></select>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="model-search">Transcription model</label>
+<input id="model-search" type="search" placeholder="Search models…" autocomplete="off" class="field" />
+<select id="model" class="field"></select>
+<div id="model-hint" class="mt-1.5 min-h-[18px] rounded-md bg-black/[0.04] px-2 py-1 font-mono text-[11px] text-neutral-500 empty:hidden dark:bg-white/[0.06] dark:text-neutral-400"></div>
+</div>
+<div class="space-y-1.5">
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="language-search">Language</label>
+<input id="language-search" type="search" placeholder="Search languages…" autocomplete="off" class="field" />
+<select id="language" class="field"></select>
+<div id="language-hint" class="mt-1.5 min-h-[18px] rounded-md bg-black/[0.04] px-2 py-1 font-mono text-[11px] text-neutral-500 empty:hidden dark:bg-white/[0.06] dark:text-neutral-400"></div>
+</div>
+<div id="cloudflare-fields" class="hidden space-y-3">
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="account-id">Cloudflare account ID</label>
+<input id="account-id" autocomplete="off" class="field font-mono" />
+</div>
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="gateway-id">Gateway ID</label>
+<input id="gateway-id" value="flow" autocomplete="off" class="field font-mono" />
+</div>
+</div>
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="token">API key</label>
+<input id="token" type="password" autocomplete="off" class="field font-mono" />
+<div id="key-status" class="mt-1 min-h-[16px] text-xs text-neutral-500 dark:text-neutral-400 [&.saved]:text-emerald-600 dark:[&.saved]:text-emerald-400"></div>
+<div class="flex items-center gap-2 min-h-[30px]"><button id="btn-test-stt" type="button" class="btn">Test transcription</button><span id="stt-test-status" class="test-status"></span></div>
+</div>
+</div>
+<div class="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm space-y-3 dark:border-white/10 dark:bg-[#2c2c2e]">
+<div class="flex items-center justify-between">
+<h2 class="text-sm font-semibold">Meeting summaries</h2>
+<span class="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:bg-white/10 dark:text-neutral-400">Optional</span>
+</div>
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="llm-base-url">Endpoint &amp; model</label>
+<div class="flex gap-2">
+<input id="llm-base-url" placeholder="https://api.openai.com/v1" autocomplete="off" class="field font-mono flex-[3]" />
+<input id="llm-model" placeholder="gpt-4o-mini" autocomplete="off" class="field font-mono flex-[2]" />
+</div>
+</div>
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="llm-token">LLM API key</label>
+<input id="llm-token" type="password" autocomplete="off" class="field font-mono" />
+<div id="llm-status" class="mt-1 min-h-[16px] text-xs text-neutral-500 dark:text-neutral-400 [&.saved]:text-emerald-600 dark:[&.saved]:text-emerald-400"></div>
+<div class="flex items-center gap-2 min-h-[30px]"><button id="btn-test-llm" type="button" class="btn">Test LLM</button><span id="llm-test-status" class="test-status"></span></div>
+</div>
+</div>
+<div class="rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm space-y-3 dark:border-white/10 dark:bg-[#2c2c2e]">
+<div class="flex items-center justify-between">
+<h2 class="text-sm font-semibold">Voice commands</h2>
+<span class="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:bg-white/10 dark:text-neutral-400">Optional</span>
+</div>
+<div>
+<label class="block text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-1.5" for="jev-token">TypeSafe or OpenRouter API key</label>
+<input id="jev-token" type="password" autocomplete="off" class="field font-mono" />
+<div id="jev-status" class="mt-1 min-h-[16px] text-xs text-neutral-500 dark:text-neutral-400 [&.saved]:text-emerald-600 dark:[&.saved]:text-emerald-400"></div>
+<div class="flex items-center gap-2 min-h-[30px]"><button id="btn-test-jev" type="button" class="btn">Test Jev</button><span id="jev-test-status" class="test-status"></span></div>
+</div>
+<div id="jev-ready" class="hidden">
+<div class="rounded-xl bg-black/[0.03] dark:bg-white/[0.04] p-3 space-y-2">
+<div class="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300 [&>.dot]:mt-0"><span id="dot-jev-key" class="dot unknown"></span><span>Jev key saved and tested</span></div>
+<div class="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300 [&>.dot]:mt-0"><span id="dot-jev-ax" class="dot unknown"></span><span>Accessibility — needed for undo, copy, select all…</span></div>
+<div class="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300 [&>.dot]:mt-0"><span id="dot-jev-se" class="dot unknown"></span><span id="txt-jev-se">Automation: System Events — not checked yet</span></div>
+<div class="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300 [&>.dot]:mt-0"><span id="dot-jev-finder" class="dot unknown"></span><span id="txt-jev-finder">Automation: Finder — not checked yet</span></div>
+</div>
+<div class="flex flex-wrap items-center gap-2 min-h-[30px] [&>.test-status]:basis-full [&>.test-status:empty]:hidden"><button id="btn-check-automation" type="button" class="btn">Check &amp; grant access</button><button id="btn-open-automation" type="button" class="btn">Open Automation Settings</button><span id="jev-ready-status" class="test-status"></span></div>
+<p class="text-[11px] text-neutral-500 dark:text-neutral-400">Terminal and Safari ask for permission the first time you open them by voice — click Allow.</p>
+</div>
+</div>
+<div id="error" class="empty:hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"></div>
+<footer class="sticky bottom-0 -mx-4 -mb-4 mt-2 flex items-center justify-between gap-3 border-t border-black/[0.08] bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-[#1c1c1e]/90">
+<small class="text-[11px] text-neutral-500 dark:text-neutral-400 max-w-[260px]">You can change the provider later from the tray menu.</small>
+<button id="btn-save" class="btn btn-primary">Continue</button>
+</footer>
 </section>
-<section id="permissions-step" class="hidden">
-<h1>Allow Flow</h1><p class="sub">One more step: Flow needs these two macOS permissions before it can dictate.</p>
-<div class="row"><span id="dot-mic" class="dot unknown"></span><div><h2>Microphone</h2><p>Records your voice while you hold the hotkey.</p><button id="btn-mic" class="primary">Enable Microphone</button></div></div>
-<div class="row"><span id="dot-ax" class="dot unknown"></span><div><h2>Accessibility</h2><p id="ax-hint">Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.</p><button id="btn-ax" class="primary">Open Accessibility Settings</button></div></div>
-<div class="row"><span id="dot-im" class="dot unknown"></span><div><h2>Input Monitoring</h2><p id="im-hint">Required for the <b>fn</b> hotkey on modern macOS — Accessibility alone does not deliver real fn presses. Toggle Flow on in the list, then <b>restart Flow</b>: macOS applies this permission only when the app launches.</p><button id="btn-im">Open Input Monitoring Settings</button> <button id="btn-restart" class="hidden">Restart Flow</button></div></div>
-<footer><button id="btn-change">Change provider</button><button id="btn-done" class="primary" disabled>Finish setup</button></footer>
+<section id="permissions-step" class="hidden space-y-3">
+<div>
+<h1 class="text-xl font-bold tracking-tight">Allow Flow</h1>
+<p class="text-[13px] text-neutral-500 dark:text-neutral-400">One more step: Flow needs these two macOS permissions before it can dictate.</p>
+</div>
+<div class="flex gap-3 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#2c2c2e]">
+<span id="dot-mic" class="dot unknown"></span>
+<div class="min-w-0 flex-1">
+<h2 class="text-[13px] font-semibold">Microphone</h2>
+<p class="mt-0.5 mb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">Records your voice while you hold the hotkey.</p>
+<div class="flex flex-wrap gap-2"><button id="btn-mic" class="btn btn-primary">Enable Microphone</button></div>
+</div>
+</div>
+<div class="flex gap-3 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#2c2c2e]">
+<span id="dot-ax" class="dot unknown"></span>
+<div class="min-w-0 flex-1">
+<h2 class="text-[13px] font-semibold">Accessibility</h2>
+<p id="ax-hint" class="mt-0.5 mb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">Lets Flow hear the <b>fn</b> key anywhere and paste text at your cursor. Click, then toggle Flow on in Settings.</p>
+<div class="flex flex-wrap gap-2"><button id="btn-ax" class="btn btn-primary">Open Accessibility Settings</button></div>
+</div>
+</div>
+<div class="flex gap-3 rounded-2xl border border-black/[0.08] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#2c2c2e]">
+<span id="dot-im" class="dot unknown"></span>
+<div class="min-w-0 flex-1">
+<h2 class="text-[13px] font-semibold">Input Monitoring</h2>
+<p id="im-hint" class="mt-0.5 mb-3 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">Required for the <b>fn</b> hotkey on modern macOS — Accessibility alone does not deliver real fn presses. Toggle Flow on in the list, then <b>restart Flow</b>: macOS applies this permission only when the app launches.</p>
+<div class="flex flex-wrap gap-2"><button id="btn-im" class="btn">Open Input Monitoring Settings</button><button id="btn-restart" class="btn hidden">Restart Flow</button></div>
+</div>
+</div>
+<footer class="sticky bottom-0 -mx-4 -mb-4 mt-2 flex items-center justify-between gap-3 border-t border-black/[0.08] bg-[#f5f5f7]/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-[#1c1c1e]/90">
+<button id="btn-change" class="btn">Change provider</button>
+<button id="btn-done" class="btn btn-primary" disabled>Finish setup</button>
+</footer>
 </section>
 <script src="./dist/src/onboarding.js"></script>
 </body>
