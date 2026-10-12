@@ -8,7 +8,7 @@ import { activateApp, frontmostApp, frontmostAppAsync, resolvePasteTarget, type 
 import { type HistoryListOptions, clearHistory, getHistoryDbPath, listTranscriptions, openHistoryDb, recordTranscription } from './main/history'
 import { insertTextAtCursor } from './main/inserter'
 import { formatTimestamp, isMeetingApp } from './main/meetings'
-import { checkForUpdates } from './main/updates'
+import { checkForUpdates, fetchLatestRelease, isNewerVersion, type ReleaseInfo } from './main/updates'
 import {
 	AUTOMATION_TARGETS,
 	allGranted,
@@ -51,6 +51,10 @@ let lastError: string | null = null
 // is the same wave with a heavier stroke — recording visibly engages it.
 let trayIdleIcon: NativeImage = nativeImage.createEmpty()
 let trayLiveIcon: NativeImage = nativeImage.createEmpty()
+// Latest release known to be newer than this build (set by the background
+// update check; drives the tray item and the update notification).
+let pendingUpdate: ReleaseInfo | null = null
+let notifiedUpdateVersion = ''
 
 // Opt-out system-sound feedback on record start/stop (settings.json).
 function feedback(sound: SystemSoundName): void {
@@ -88,21 +92,17 @@ function buildTrayMenu(): Menu {
 		{ label: 'Start / stop (⌥Space)', click: () => (meetingRecording ? void stopMeeting('ui') : recording ? void stopListening('toggle') : void startListening('shortcut')) },
 		{ type: 'separator' },
 	]
+	if (pendingUpdate) {
+		items.push({ label: `Install Flow ${pendingUpdate.version}…`, click: () => runInteractiveUpdate() })
+		items.push({ type: 'separator' })
+	}
 	if (lastError) {
 		items.push({ label: `Last error: ${lastError}`, enabled: false })
 		items.push({ type: 'separator' })
 	}
 	items.push({
 		label: 'Check for Updates',
-		click: () => {
-			if (updating) return
-			updating = true
-			if (recording) cancelListening()
-			void checkForUpdates((pct) => setState({ phase: 'working', message: `Updating… ${pct}%` })).finally(() => {
-				updating = false
-				if (currentPhase === 'working') setState({ phase: 'idle' })
-			})
-		},
+		click: () => runInteractiveUpdate(),
 	})
 	items.push(
 		{
@@ -167,6 +167,46 @@ function refreshTrayMenu(): void {
 		tray?.setContextMenu(buildTrayMenu())
 	} catch {
 		// tray menu is best-effort
+	}
+}
+
+// The shared interactive update flow: tray item, notification click, and the
+// manual check all land here (compare, confirm, download, swap, relaunch).
+function runInteractiveUpdate(): void {
+	if (updating) return
+	updating = true
+	if (recording) cancelListening()
+	void checkForUpdates((pct) => setState({ phase: 'working', message: `Updating… ${pct}%` })).finally(() => {
+		updating = false
+		if (currentPhase === 'working') setState({ phase: 'idle' })
+	})
+}
+
+// ---- automatic update detection ----
+// One silent check shortly after launch, then every few hours while Flow
+// runs. A found update surfaces as a tray item plus one notification per
+// version; failures stay silent (the manual tray flow keeps its dialogs).
+const UPDATE_CHECK_DELAY_MS = 30_000
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+async function autoCheckUpdates(): Promise<void> {
+	if (!loadSettings().updateChecks || updating || recording || meetingRecording) return
+	try {
+		const release = await fetchLatestRelease()
+		if (!release || !isNewerVersion(release.version, app.getVersion())) return
+		pendingUpdate = release
+		refreshTrayMenu()
+		if (release.version !== notifiedUpdateVersion && Notification.isSupported()) {
+			notifiedUpdateVersion = release.version
+			const notification = new Notification({
+				title: 'Flow update available',
+				body: `Flow ${release.version} is ready to install — click to update.`,
+			})
+			notification.on('click', () => runInteractiveUpdate())
+			notification.show()
+		}
+	} catch {
+		// offline or rate-limited — the next interval covers it
 	}
 }
 
@@ -747,6 +787,10 @@ export async function boot(): Promise<void> {
 	if (trayIdleIcon.isEmpty()) tray.setTitle('◉')
 	tray.setToolTip('Flow — hold fn to dictate')
 	tray.setContextMenu(buildTrayMenu())
+
+	// Background update detection (opt-out: updateChecks: false in settings.json).
+	setTimeout(() => void autoCheckUpdates(), UPDATE_CHECK_DELAY_MS)
+	setInterval(() => void autoCheckUpdates(), UPDATE_CHECK_INTERVAL_MS)
 
 	ipcMain.on('flow:audio', (_e, payload: { base64: string; mime: string; done: boolean }) => {
 		if (meetingRecording) {

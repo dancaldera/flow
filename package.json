@@ -1,6 +1,7 @@
 {
   "productName": "Flow",
   "build": {
+    "afterSign": "scripts/after-sign.js",
     "appId": "com.flow.dictation",
     "asar": true,
     "asarUnpack": [

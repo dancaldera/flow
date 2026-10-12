@@ -123,6 +123,7 @@ describe('loadSettings', () => {
 		expect(settings.maxSeconds).toBe(60)
 		expect(settings.muteSystemAudio).toBe(false)
 		expect(settings.soundFeedback).toBe(true)
+		expect(settings.updateChecks).toBe(true)
 		expect(settings.llmBaseUrl).toBe(DEFAULT_LLM_BASE_URL)
 		expect(settings.llmModel).toBe(DEFAULT_LLM_MODEL)
 	})
@@ -144,6 +145,7 @@ describe('loadSettings', () => {
 			maxSeconds: 90,
 			muteSystemAudio: true,
 			soundFeedback: false,
+			updateChecks: false,
 			llmBaseUrl: 'https://llm.test/v1',
 			llmModel: 'big',
 		})
@@ -154,6 +156,7 @@ describe('loadSettings', () => {
 		expect(settings.maxSeconds).toBe(90)
 		expect(settings.muteSystemAudio).toBe(true)
 		expect(settings.soundFeedback).toBe(false)
+		expect(settings.updateChecks).toBe(false)
 	})
 
 	it('falls back to the provider default for a stale saved model or language', () => {
@@ -208,6 +211,13 @@ describe('loadSettings', () => {
 		expect(loadSettings().soundFeedback).toBe(true)
 		writeSettingsFile({ provider: 'openai', soundFeedback: false })
 		expect(loadSettings().soundFeedback).toBe(false)
+	})
+
+	it('keeps update checks on unless explicitly disabled', () => {
+		writeSettingsFile({ provider: 'openai', updateChecks: 'off' })
+		expect(loadSettings().updateChecks).toBe(true)
+		writeSettingsFile({ provider: 'openai', updateChecks: false })
+		expect(loadSettings().updateChecks).toBe(false)
 	})
 })
 
