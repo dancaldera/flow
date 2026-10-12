@@ -1,9 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="61 81 390 390" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="57 137 398 278" fill="none">
   <!-- Menu-bar template icon (black + alpha; macOS tints it for the menu bar).
        Derived from assets/logo/flow-glyph.svg: the voice waveform flowing into
-       a text line, optically centered on a square canvas so 16px and @2x 32px
-       stay exact. Rasterized by the command in this directory's README note:
-       magick -background none flow-template.svg -resize 16x16 flowTemplate.png -->
+       a text line. The canvas is TIGHT to the glyph and naturally wide (not a
+       padded square) so the mark fills the menulet height; both this and the
+       live variant share the same canvas so the idle↔live swap never shifts.
+       Regenerate the PNGs with scripts/render-tray-icons.sh (ImageMagick —
+       qlmanage pads non-square SVGs onto white and librsvg isn't installed). -->
   <path d="M88 256
            C102 256 102 166 120 166
            C138 166 138 256 152 256
@@ -12,5 +14,5 @@
            C230 256 230 176 246 176
            C262 176 262 256 278 256
            L424 256"
-        stroke="#000" stroke-width="34" stroke-linecap="round"/>
+        stroke="#000" stroke-width="28" stroke-linecap="round"/>
 </svg>
