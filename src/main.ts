@@ -2,7 +2,7 @@ import { ChildProcess, execFile, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
-import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, screen, shell } from 'electron'
+import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, screen, shell, systemPreferences, type NativeImage } from 'electron'
 import { ERROR_VISIBLE_MS, IPC_CHANNELS, type FlowPhase, type FlowState } from './ipc'
 import { activateApp, frontmostApp, frontmostAppAsync, resolvePasteTarget, type AppRef } from './main/focus'
 import { type HistoryListOptions, clearHistory, getHistoryDbPath, listTranscriptions, openHistoryDb, recordTranscription } from './main/history'
@@ -24,6 +24,7 @@ import {
 	type PermissionState,
 } from './main/permissions'
 import { createPillWindow, parseScreenTruth, placePillBottomCenter, placementKey, resolvePaths, setPillInteractive, shouldHugBottom, type ScreenTruth } from './main/pillWindow'
+import { playSystemSound, type SystemSoundName } from './main/sound'
 import { PROVIDERS, STT_PROVIDERS, isProviderConfigured, jevStatus, llmStatus, loadProviderToken, loadSettings, providerStatus, resolveJevToken, resolveLlmSetup, resolveProviderSetup, saveJevSetup, saveLlmSetup, saveProviderSetup, saveSettings } from './main/settings'
 import { muteSystemAudio, restoreSystemAudio, restoreSystemAudioSync } from './main/systemAudio'
 import { decideCommand, runCommand, testJev } from './services/jev'
@@ -45,6 +46,16 @@ let currentPhase: FlowPhase = 'idle'
 let errorTimer: NodeJS.Timeout | null = null
 let updating = false
 let lastError: string | null = null
+// Menu-bar template icons, loaded once in boot(): monochrome black+alpha
+// PNGs that macOS tints to match the menu bar appearance. The "live" variant
+// is the same wave with a heavier stroke — recording visibly engages it.
+let trayIdleIcon: NativeImage = nativeImage.createEmpty()
+let trayLiveIcon: NativeImage = nativeImage.createEmpty()
+
+// Opt-out system-sound feedback on record start/stop (settings.json).
+function feedback(sound: SystemSoundName): void {
+	if (loadSettings().soundFeedback) playSystemSound(sound)
+}
 
 function setState(state: FlowState): void {
 	currentPhase = state.phase
@@ -62,15 +73,12 @@ function setState(state: FlowState): void {
 			if (currentPhase === 'error') setState({ phase: 'idle' })
 		}, ERROR_VISIBLE_MS)
 	}
-	// Mirror into the menu bar as an icon only — words live in the pill
-	// and the latest error in the tray menu.
+	// Mirror into the menu bar: the template icon goes bold while listening.
+	// Words live in the pill; the latest error lives in the tray menu.
 	try {
-		if (state.phase === 'listening') tray?.setTitle('●')
-		else if (state.phase === 'working') tray?.setTitle('…')
-		else if (state.phase === 'error') tray?.setTitle('✕')
-		else tray?.setTitle('◉')
+		tray?.setImage(state.phase === 'listening' ? trayLiveIcon : trayIdleIcon)
 	} catch {
-		// tray text is best-effort
+		// tray image is best-effort
 	}
 }
 
@@ -85,7 +93,7 @@ function buildTrayMenu(): Menu {
 		items.push({ type: 'separator' })
 	}
 	items.push({
-		label: 'Check for updates…',
+		label: 'Check for Updates',
 		click: () => {
 			if (updating) return
 			updating = true
@@ -103,10 +111,10 @@ function buildTrayMenu(): Menu {
 			checked: loadSettings().muteSystemAudio === true,
 			click: (item) => saveSettings({ ...loadSettings(), muteSystemAudio: item.checked }),
 		},
-		{ label: 'Setup & permissions…', click: () => showOnboarding() },
-		{ label: 'How to use Flow…', click: () => showHowToUse() },
+		{ label: 'Settings…', click: () => showOnboarding() },
+		{ label: 'How to Use Flow', click: () => showHowToUse() },
 		{ label: 'History…', click: () => openHistoryWindow() },
-		{ label: 'Edit settings.json', click: () => shell.openPath(app.getPath('userData')) },
+		{ label: 'Open Settings Folder', click: () => shell.openPath(app.getPath('userData')) },
 		{ label: 'Quit', click: () => app.quit() },
 	)
 	return Menu.buildFromTemplate(items)
@@ -138,11 +146,16 @@ function openHistoryWindow(): void {
 		minWidth: 360,
 		minHeight: 400,
 		title: 'Flow History',
-		backgroundColor: '#1e1e20',
+		// Native window material: vibrancy behind translucent surfaces in
+		// history.css, with inset traffic lights instead of a titled bar.
+		titleBarStyle: 'hiddenInset',
+		vibrancy: 'under-window',
+		visualEffectState: 'active',
+		backgroundColor: '#00000000',
 		webPreferences: { preload: preloadPath },
 		show: false,
 	})
-	void historyWin.loadFile(historyPath)
+	void historyWin.loadFile(historyPath, accentQuery())
 	historyWin.once('ready-to-show', () => historyWin?.show())
 	historyWin.on('closed', () => {
 		historyWin = null
@@ -154,6 +167,28 @@ function refreshTrayMenu(): void {
 		tray?.setContextMenu(buildTrayMenu())
 	} catch {
 		// tray menu is best-effort
+	}
+}
+
+function trayTemplateImage(name: 'flowTemplate' | 'flowLiveTemplate'): NativeImage {
+	// Unpacked next to the asar in releases (see package.json asarUnpack);
+	// plain repo layout in dev.
+	const base = app.getAppPath().replace('app.asar', 'app.asar.unpacked')
+	const image = nativeImage.createFromPath(path.join(base, 'assets', 'tray', `${name}.png`))
+	image.setTemplateImage(true)
+	return image
+}
+
+// The user's macOS accent color as RRGGBB, handed to the real windows via
+// ?accent= so buttons and focus rings match the system tint. Omitted when it
+// is Apple's default blue — the CSS palettes then carry the correct
+// light/dark blue themselves (renderers set --accent only if present).
+function accentQuery(): { query: { accent: string } } | undefined {
+	try {
+		const hex = systemPreferences.getAccentColor().slice(0, 6).toLowerCase()
+		return /^[0-9a-f]{6}$/.test(hex) && hex !== '007aff' ? { query: { accent: hex } } : undefined
+	} catch {
+		return undefined
 	}
 }
 
@@ -279,6 +314,7 @@ async function startListening(source: string): Promise<void> {
 	chunks = []
 	seconds = 0
 	const { maxSeconds, muteSystemAudio: mute } = loadSettings()
+	feedback('Tink')
 	// Async on purpose: capture starts immediately, the mute lands ~100ms in —
 	// the stray first tenth of a second never carries speech worth keeping.
 	if (mute) void muteSystemAudio()
@@ -320,6 +356,7 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 			await ensurePasteTarget()
 			try {
 				await runCommand(command)
+				feedback('Pop')
 				setState({ phase: 'idle' })
 			} catch (error) {
 				const msg = error instanceof Error ? error.message : String(error)
@@ -342,6 +379,7 @@ async function stopListening(reason: 'release' | 'toggle' | 'timeout' | 'ui'): P
 		}
 		await ensurePasteTarget()
 		await insertTextAtCursor(text)
+		feedback('Pop')
 		setState({ phase: 'idle' })
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error)
@@ -421,10 +459,11 @@ async function pollMeetingSuggest(): Promise<void> {
 async function startMeeting(): Promise<void> {
 	if (meetingRecording || recording || updating || !pill) return
 	if (!isProviderConfigured()) {
-		setState({ phase: 'error', message: 'Configure transcription first (Setup & permissions…)' })
+		setState({ phase: 'error', message: 'Configure transcription first (Settings…)' })
 		return
 	}
 	console.log('[flow] meeting start')
+	feedback('Tink')
 	meetingRecording = true
 	meetingChunks = []
 	meetingSegments = []
@@ -508,6 +547,7 @@ async function stopMeeting(reason: 'ui' | 'timeout'): Promise<void> {
 			console.log(`[flow] meeting history failed: ${error instanceof Error ? error.message : error}`)
 		}
 	}
+	feedback('Pop')
 	const llm = createLlmClient(settings)
 	if (!llm) {
 		notify('Meeting transcribed', 'Transcript saved to History. Add an LLM key in Setup for summaries.')
@@ -582,7 +622,7 @@ function showHowToUse(): void {
 		type: 'info',
 		title: 'How to use Flow',
 		message: 'Hold fn, speak, release — text lands at your cursor.',
-		detail: '⌥Space starts/stops as a fallback.\nEsc cancels while listening.\nListening stops automatically at the time limit.\nHover the pill to expand it — hold to talk, or double-click to keep recording until you click again.\nIn a video call the pill offers Transcribe meeting — click to record, click again to stop; the transcript and summary land in History.\nChange provider, model, or language anytime via Setup & permissions…',
+		detail: '⌥Space starts/stops as a fallback.\nEsc cancels while listening.\nListening stops automatically at the time limit.\nHover the pill to expand it — hold to talk, or double-click to keep recording until you click again.\nIn a video call the pill offers Transcribe meeting — click to record, click again to stop; the transcript and summary land in History.\nChange provider, model, or language anytime via Settings…',
 		buttons: ['Got it'],
 	})
 }
@@ -596,14 +636,20 @@ function showOnboarding(): void {
 		width: 460,
 		height: 800,
 		resizable: false,
-		alwaysOnTop: true,
+		// Native window material like History: vibrancy behind the translucent
+		// page wash, inset traffic lights. Not always-on-top — setup windows
+		// shouldn't cover what the user is being asked to grant access to.
+		titleBarStyle: 'hiddenInset',
+		vibrancy: 'under-window',
+		visualEffectState: 'active',
+		backgroundColor: '#00000000',
 		webPreferences: {
 			nodeIntegration: false,
 			contextIsolation: true,
 			preload: path.join(__dirname, 'preload.js'),
 		},
 	})
-	void onboarding.loadFile(path.join(__dirname, '..', '..', 'onboarding.html'))
+	void onboarding.loadFile(path.join(__dirname, '..', '..', 'onboarding.html'), accentQuery())
 	onboarding.on('closed', () => {
 		onboarding = null
 	})
@@ -649,8 +695,44 @@ function registerFallbackShortcut(): void {
 	}
 }
 
+// Real menu-bar chrome for Flow's windows (Settings, History). Without an
+// application menu the macOS text-editing shortcuts (⌘C/⌘V/⌘X/⌘A/⌘Z) and
+// ⌘W/⌘M/⌘Q do not exist in Electron, and there is no About panel.
+function installAppMenu(): void {
+	Menu.setApplicationMenu(
+		Menu.buildFromTemplate([
+			{
+				label: app.name,
+				submenu: [
+					{ role: 'about' },
+					{ type: 'separator' },
+					{ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => showOnboarding() },
+					{ type: 'separator' },
+					{ role: 'services' },
+					{ type: 'separator' },
+					{ role: 'hide' },
+					{ role: 'hideOthers' },
+					{ role: 'unhide' },
+					{ type: 'separator' },
+					{ role: 'quit' },
+				],
+			},
+			{ role: 'editMenu' },
+			{ role: 'windowMenu' },
+			{ label: 'Help', submenu: [{ label: 'How to Use Flow', click: () => showHowToUse() }] },
+		]),
+	)
+}
+
 export async function boot(): Promise<void> {
 	await app.whenReady()
+
+	app.setAboutPanelOptions({
+		applicationName: 'Flow',
+		applicationVersion: app.getVersion(),
+		credits: 'MIT License — https://github.com/dancaldera/flow',
+	})
+	installAppMenu()
 
 	try {
 		historyDb = openHistoryDb(getHistoryDbPath())
@@ -658,8 +740,11 @@ export async function boot(): Promise<void> {
 		console.log(`[flow] history db unavailable: ${error instanceof Error ? error.message : error}`)
 	}
 
-	tray = new Tray(nativeImage.createEmpty())
-	tray.setTitle('◉')
+	trayIdleIcon = trayTemplateImage('flowTemplate')
+	trayLiveIcon = trayTemplateImage('flowLiveTemplate')
+	tray = new Tray(trayIdleIcon.isEmpty() ? nativeImage.createEmpty() : trayIdleIcon)
+	// Fallback when the template assets are missing (dev checkout without assets).
+	if (trayIdleIcon.isEmpty()) tray.setTitle('◉')
 	tray.setToolTip('Flow — hold fn to dictate')
 	tray.setContextMenu(buildTrayMenu())
 

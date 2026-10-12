@@ -196,6 +196,8 @@ export interface FlowSettings {
 	// Opt-in (tray checkbox): mute macOS output while dictating so playing
 	// audio cannot bleed into the recording. Meeting mode never mutes.
 	muteSystemAudio: boolean
+	// Opt-out (settings.json): subtle system sounds on record start/stop.
+	soundFeedback: boolean
 	llmBaseUrl: string
 	llmModel: string
 }
@@ -211,6 +213,7 @@ const DEFAULTS: FlowSettings = {
 	language: '',
 	maxSeconds: 60,
 	muteSystemAudio: false,
+	soundFeedback: true,
 	llmBaseUrl: DEFAULT_LLM_BASE_URL,
 	llmModel: DEFAULT_LLM_MODEL,
 }
@@ -255,11 +258,12 @@ export function loadSettings(): FlowSettings {
 		const llmBaseUrl = saved.llmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL
 		const llmModel = saved.llmModel?.trim() || DEFAULT_LLM_MODEL
 		const muteSystemAudio = saved.muteSystemAudio === true
+		const soundFeedback = saved.soundFeedback !== false
 		const maxSeconds =
 			typeof saved.maxSeconds === 'number' && Number.isFinite(saved.maxSeconds) && saved.maxSeconds > 0
 				? Math.floor(saved.maxSeconds)
 				: DEFAULTS.maxSeconds
-		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel, muteSystemAudio, maxSeconds }
+		return { ...DEFAULTS, ...saved, provider, model, language, llmBaseUrl, llmModel, muteSystemAudio, soundFeedback, maxSeconds }
 	} catch {
 		const provider = detectedEnvironmentProvider()
 		return { ...DEFAULTS, provider, model: PROVIDERS[provider].defaultModel }

@@ -11,6 +11,14 @@ type OnboardingState = { permissions: { microphone: PermissionState; accessibili
 
 const DEFAULT_FN_HINT = 'Lets Flow hear <b>fn</b> anywhere and paste at your cursor. macOS needs Flow switched on in two places — turn each on, then restart Flow.'
 
+// System accent color (RRGGBB) passed by main via ?accent= when the user's
+// macOS accent is not the default blue; the CSS palette then supplies the
+// correct light/dark Apple blue itself.
+const accentParam = new URLSearchParams(window.location.search).get('accent')
+if (accentParam && /^[0-9a-f]{6}$/i.test(accentParam)) {
+	document.documentElement.style.setProperty('--accent', `#${accentParam.toLowerCase()}`)
+}
+
 declare global {
 	interface Window {
 		flowSetup: {

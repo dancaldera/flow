@@ -4,6 +4,7 @@
     "appId": "com.flow.dictation",
     "asar": true,
     "asarUnpack": [
+      "assets/tray/*",
       "swift/flow-fn-listener",
       "swift/flow-fullscreen-check",
       "swift/flow-frontmost",
@@ -13,6 +14,7 @@
       "output": "release/"
     },
     "files": [
+      "assets/tray/*",
       "dist/**/*",
       "history.html",
       "index.html",

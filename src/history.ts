@@ -32,6 +32,14 @@ const pageInfoEl = document.getElementById('pageinfo') as HTMLSpanElement
 const PAGE_SIZE = 50
 const FILTER_DEBOUNCE_MS = 250
 
+// System accent color (RRGGBB) passed by main via ?accent= when the user's
+// macOS accent is not the default blue; the CSS palette then supplies the
+// correct light/dark Apple blue itself.
+const accentParam = new URLSearchParams(window.location.search).get('accent')
+if (accentParam && /^[0-9a-f]{6}$/i.test(accentParam)) {
+	document.documentElement.style.setProperty('--accent', `#${accentParam.toLowerCase()}`)
+}
+
 let entries: HistoryEntry[] = []
 let page = 1
 let total = 0

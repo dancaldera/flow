@@ -2,17 +2,43 @@
 @source "../onboarding.html";
 @source "../src/onboarding.ts";
 
+/* System accent: set by onboarding.ts from ?accent=RRGGBB when the user's
+   macOS accent is not the default blue; otherwise these Apple blues apply. */
+:root { --accent: #007aff; }
+@media (prefers-color-scheme: dark) { :root { --accent: #0a84ff; } }
+
+/* Thin overlay-style scrollbar — macOS never paints a full track over a
+   window material. */
+::-webkit-scrollbar { width: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.4); border: 3px solid transparent; border-radius: 6px; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background-color: rgba(128, 128, 128, 0.65); }
+
 @layer components {
 	.field {
-		@apply w-full rounded-md border border-black/10 bg-white px-2.5 py-1.5 text-[12px] text-inherit shadow-none outline-none transition placeholder:text-neutral-400 focus:border-[#007aff] focus:ring-[3px] focus:ring-[#007aff]/20 dark:border-white/15 dark:bg-[#1c1c1e] dark:placeholder:text-neutral-500;
+		@apply w-full rounded-md border border-black/10 bg-white px-2.5 py-1.5 text-[12px] text-inherit shadow-none outline-none transition placeholder:text-neutral-400 dark:border-white/15 dark:bg-[#1c1c1e] dark:placeholder:text-neutral-500;
+	}
+	.field:focus {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 	}
 
 	.btn {
-		@apply inline-flex items-center justify-center rounded-md border border-black/10 bg-white px-3 py-1 text-[12px] font-medium whitespace-nowrap transition hover:bg-black/[0.04] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#007aff]/30 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:hover:bg-white/10;
+		@apply inline-flex items-center justify-center rounded-md border border-black/10 bg-white px-3 py-1 text-[12px] font-medium whitespace-nowrap transition hover:bg-black/[0.04] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:hover:bg-white/10;
+	}
+	.btn:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
 	}
 
 	.btn-primary {
-		@apply border-[#007aff] bg-[#007aff] text-white hover:bg-[#0071e3] dark:border-[#0a84ff] dark:bg-[#0a84ff] dark:hover:bg-[#3395ff];
+		border-color: var(--accent);
+		background-color: var(--accent);
+		color: #fff;
+	}
+	.btn-primary:hover { background-color: color-mix(in srgb, var(--accent) 88%, #000); }
+	@media (prefers-color-scheme: dark) {
+		.btn-primary:hover { background-color: color-mix(in srgb, var(--accent) 82%, #fff); }
 	}
 
 	.dot {

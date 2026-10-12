@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="61 81 390 390" fill="none">
+  <!-- Recording-state variant of flow-template.svg: same wave, heavier stroke,
+       so the menu-bar icon visibly "engages" while dictating. -->
+  <path d="M88 256
+           C102 256 102 166 120 166
+           C138 166 138 256 152 256
+           C166 256 166 386 184 386
+           C202 386 202 256 216 256
+           C230 256 230 176 246 176
+           C262 176 262 256 278 256
+           L424 256"
+        stroke="#000" stroke-width="52" stroke-linecap="round"/>
+</svg>

@@ -1,21 +1,129 @@
-:root { color-scheme: dark; }
-html, body { margin: 0; padding: 0; background: #1e1e20; color: #f2f2f4; font-family: -apple-system, system-ui, sans-serif; }
-body { padding: 16px 18px 12px; }
-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-h1 { font-size: 15px; font-weight: 600; margin: 0; }
-button { font: inherit; font-size: 12px; color: #f2f2f4; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
-button:hover { background: rgba(255, 255, 255, 0.16); }
-#filter { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; color: inherit; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; outline: none; }
-#filter:focus { border-color: rgba(255, 255, 255, 0.3); }
+/* History window. The BrowserWindow itself is an NSVisualEffectView
+   (vibrancy: 'under-window', set in main.ts) with inset traffic lights —
+   every surface here is translucent so the material shows through, and the
+   palette follows the system appearance (light values, dark overrides). */
+:root {
+	color-scheme: light dark;
+	--text: #1d1d1f;
+	--text-dim: rgba(0, 0, 0, 0.55);
+	--surface: rgba(0, 0, 0, 0.05);
+	--surface-border: rgba(0, 0, 0, 0.09);
+	--control: rgba(0, 0, 0, 0.07);
+	--control-border: rgba(0, 0, 0, 0.13);
+	--control-hover: rgba(0, 0, 0, 0.12);
+	/* Overridden to the user's macOS accent color when it is not the default
+	   blue (main.ts passes ?accent=RRGGBB; see history.ts). */
+	--accent: #007aff;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--text: #f2f2f4;
+		--text-dim: rgba(255, 255, 255, 0.55);
+		--surface: rgba(255, 255, 255, 0.055);
+		--surface-border: rgba(255, 255, 255, 0.09);
+		--control: rgba(255, 255, 255, 0.09);
+		--control-border: rgba(255, 255, 255, 0.14);
+		--control-hover: rgba(255, 255, 255, 0.15);
+		--accent: #0a84ff;
+	}
+}
+
+html, body {
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	color: var(--text);
+	font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+body {
+	box-sizing: border-box;
+	/* Top padding clears the inset traffic lights; the header doubles as a
+	   drag handle for the borderless-looking window. */
+	padding: 26px 18px 0;
+}
+
+header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 10px;
+	-webkit-app-region: drag;
+}
+h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+
+button {
+	font: inherit;
+	font-size: 12px;
+	color: var(--text);
+	background: var(--control);
+	border: 1px solid var(--control-border);
+	border-radius: 7px;
+	padding: 4px 11px;
+	cursor: pointer;
+	-webkit-app-region: no-drag;
+}
+button:hover { background: var(--control-hover); }
+button:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); border-color: var(--accent); }
+button:active { filter: brightness(0.92); }
+
+#filter {
+	width: 100%;
+	box-sizing: border-box;
+	font: inherit;
+	font-size: 13px;
+	color: inherit;
+	background: var(--control);
+	border: 1px solid var(--control-border);
+	border-radius: 7px;
+	padding: 6px 10px;
+	margin-bottom: 10px;
+	outline: none;
+}
+#filter:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 #list { display: flex; flex-direction: column; gap: 8px; }
-.row { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 8px 10px; }
-.time { font-size: 11px; opacity: 0.55; margin-bottom: 2px; }
+.row {
+	background: var(--surface);
+	border: 1px solid var(--surface-border);
+	border-radius: 10px;
+	padding: 8px 10px;
+}
+.time { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
 .text { font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
 .copy { margin-top: 6px; }
-#empty { text-align: center; opacity: 0.55; font-size: 13px; padding: 32px 0; }
-#dock { position: sticky; bottom: 0; background: #1e1e20; padding: 4px 0 2px; }
-#pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
-#pageinfo { font-size: 12px; opacity: 0.6; min-width: 140px; text-align: center; }
+#empty { text-align: center; color: var(--text-dim); font-size: 13px; padding: 32px 0; }
+
+/* Bottom dock blurs the rows scrolling underneath it — the material-aware
+   equivalent of an opaque footer over vibrancy. */
+#dock {
+	position: sticky;
+	bottom: 0;
+	margin: 12px -18px 0;
+	padding: 6px 18px 12px;
+	background: transparent;
+	backdrop-filter: blur(20px) saturate(1.4);
+	-webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+#pager { display: flex; align-items: center; justify-content: center; gap: 12px; }
+#pageinfo { font-size: 12px; color: var(--text-dim); min-width: 140px; text-align: center; }
 button:disabled { opacity: 0.35; cursor: default; }
-button:disabled:hover { background: rgba(255, 255, 255, 0.1); }
-footer { margin-top: 12px; font-size: 11px; opacity: 0.45; text-align: center; }
+button:disabled:hover { background: var(--control); }
+button:disabled:active { filter: none; }
+footer { margin-top: 10px; font-size: 11px; color: var(--text-dim); text-align: center; }
+
+/* Thin overlay-style scrollbar — macOS never paints a full scrollbar track
+   over a window material. */
+::-webkit-scrollbar { width: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+	background: rgba(128, 128, 128, 0.4);
+	border: 3px solid transparent;
+	border-radius: 6px;
+	background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(128, 128, 128, 0.65); }
